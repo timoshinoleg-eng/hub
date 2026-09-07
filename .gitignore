@@ -1,0 +1,15 @@
+# зависимости
+node_modules/
+
+# секреты (реальный токен бота лежит в .env, не в example)
+.env
+.env.local
+.env.*.local
+
+# логи и артефакты сборки
+*.log
+.DS_Store
+dist/
+coverage/
+.idea/
+.vscode/

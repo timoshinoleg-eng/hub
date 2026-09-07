@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<title>Игротека</title>
+<link rel="stylesheet" href="css/hub.css">
+
+<!-- MAX Bridge. В обычном браузере скрипт просто не определяет window.WebApp —
+     хаб работает и без него, отдельная dev-сборка не нужна. -->
+<script src="https://st.max.ru/js/max-web-app.js" defer></script>
+
+<script>
+  // Единственное, что нужно поменять перед деплоем.
+  // bot — ник бота из личного кабинета MAX (вида idИНН_bot, изменить нельзя).
+  // Без него deep link в шаринг-карточке не формируется.
+  window.HUB_CONFIG = {
+    bot: '',               // например: 'id7701234567_bot'
+    hubName: 'Игротека',
+    policyUrl: '',         // https://example.ru/privacy — обязательно для юрлица
+    offerUrl: '',          // https://example.ru/offer
+    orgName: '',           // ООО «...» — для подвала
+  };
+  // Адрес сервера событий из server/index.mjs
+  // window.HUB_TRACK_ENDPOINT = 'https://api.example.com/ev';
+</script>
+</head>
+
+<body data-view="menu">
+
+<div id="view-menu">
+  <div class="mhead">
+    <h1>Игротека</h1>
+    <span class="sub" id="count"></span>
+  </div>
+  <div id="games"></div>
+  <p class="mfoot" id="legal"></p>
+</div>
+
+<div id="view-game">
+  <div class="gbar">
+    <button id="back" aria-label="Назад">‹</button>
+    <h2 id="game-title">Игра</h2>
+    <span id="game-score"></span>
+    <button id="reload" aria-label="Заново">⟳</button>
+  </div>
+  <iframe id="game-frame" title="Игра" allow="autoplay"></iframe>
+</div>
+
+<div id="overlay"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

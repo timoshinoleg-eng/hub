@@ -1,0 +1,9 @@
+# Нормализация концов строк: LF везде (кроссплатформенно)
+* text=auto eol=lf
+
+# Бинарные ассеты не переносим
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.gif binary
