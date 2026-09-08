@@ -28,6 +28,7 @@ const hub = read('js/main.js');
 const hubCss = read('css/hub.css') + '\n' + read('css/polish.css');
 const share = read('js/share.js');
 const icons = read('assets/icons.svg');
+const uiState = read('js/ui-state.js');
 
 assert.ok(index.includes('МИНИ-АРКАДА MAX'), 'brand kicker is localized');
 assert.ok(index.indexOf('progress-strip') < index.indexOf('game-grid'), 'progress is visible before the game library');
@@ -37,16 +38,24 @@ assert.ok(icons.includes('id="brand"'), 'sprite contains brand symbol');
 
 assert.ok(hub.includes("from './progress.js'"), 'hub has local progression');
 assert.ok(hub.includes("from './engagement.js'") && hub.includes('observeVisit()'), 'privacy-safe engagement is wired into production shell');
+assert.ok(hub.includes("from './ui-state.js'"), 'explicit UI state semantics are wired into production shell');
 assert.ok(hub.includes("track('new_record'") && hub.includes("track('daily_complete'"), 'record and daily retention events');
 assert.ok(hub.includes("track('return_visit'") && hub.includes("track('first_visit'"), 'return/first visit events are emitted by the shell');
 assert.ok(hub.includes("bridge.haptic('selection')"), 'MAX haptic feedback stays integrated');
 assert.ok(hub.includes('Начни<br>серию'), 'zero streak has a meaningful empty state');
+assert.ok(hub.includes('progress-first') && hub.includes('Сыграй первую партию'), 'first launch avoids a dead zero-stat strip');
+assert.ok(hub.includes('dailyHeroState(pg, today, summary.completedToday)'), 'daily hero distinguishes its own completion from any daily streak progress');
 assert.ok(hub.includes('✦ ЕЖЕДНЕВНО'), 'non-hero daily-capable game is not mislabeled as today');
 assert.ok(hub.includes('const catalog = all.filter((g) => g.id !== daily?.id)'), 'daily hero is not duplicated in the game grid');
 assert.ok(hub.includes("style.setProperty('--active-game'"), 'game shell inherits current game accent');
 assert.ok(hub.includes("f.style.opacity = '1'"), 'iframe reveal waits for embedded config handshake');
 assert.ok(hub.includes('result-icon-wrap') && !hub.includes('<div class="result-emoji">'), 'result loop uses local vector identity');
 assert.ok(hub.includes('hub_notify_prompted_v1'), 'subscription prompt is rate-limited instead of persistent');
+assert.ok(hub.includes("resultCard.classList.add('share-fallback')"), 'share fallback has an explicit compact visual state');
+assert.ok(hub.includes("recordBadgeText(meta)"), 'first-ever record and later record improvements are visually distinct');
+assert.ok(hub.includes('challengeResultState(duel, higherIsBetter)'), 'challenge result exposes win/tie/loss state instead of generic copy');
+assert.ok(hub.includes('challengeIntroText(sp.challenge'), 'challenge intro matches equality semantics');
+assert.ok(hub.includes("CFG.policyUrl\n    ?"), 'consent UI does not render a dead policy link when policy URL is absent');
 
 for (const token of ['daily-card', 'game-grid', 'record-pill', 'game-tip', 'confetti']) {
   assert.ok(hubCss.includes(token), `shell keeps ${token} visual layer`);
@@ -55,6 +64,14 @@ assert.ok(hubCss.includes('@media(max-width:380px)'), '360/375px layouts have an
 assert.ok(hubCss.includes('.gbadge{font-size:10px}'), 'functional badge text is no longer sub-10px');
 assert.ok(hubCss.includes('.result-icon-wrap'), 'result card has product-owned icon styling');
 assert.ok(hubCss.includes('--active-game'), 'active game accent is visible in game/result shell');
+assert.ok(hubCss.includes('.progress-strip.is-empty') && hubCss.includes('.progress-first'), 'first-launch progress state is styled');
+assert.ok(hubCss.includes('.rduel.tie'), 'challenge tie has its own visual state');
+assert.ok(hubCss.includes('.share-fallback .rimg'), 'share fallback preview is constrained on mobile');
+assert.ok(hubCss.includes('.consent-card'), 'consent is a dedicated visual state');
+assert.ok(hubCss.includes('max-height:calc(100dvh'), 'result cards remain scroll-safe on short WebViews');
+
+assert.ok(uiState.includes('dailyHeroState') && uiState.includes('challengeResultState'), 'UI state module contains daily and challenge semantics');
+assert.ok(uiState.includes('ПЕРВЫЙ РЕКОРД') && uiState.includes('НОВЫЙ РЕКОРД'), 'record state copy is explicit');
 
 assert.ok(!share.includes('Segoe UI Emoji') && !share.includes('emoji ||'), 'share card no longer depends on system emoji');
 assert.ok(share.includes('drawBrandMark'), 'share card carries the product visual mark');
