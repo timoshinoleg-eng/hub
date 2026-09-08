@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const DEFAULT_MAX_AGE_SECONDS = 24 * 60 * 60;
+const DEFAULT_MAX_AGE_SECONDS = 60 * 60;
 const FUTURE_SKEW_SECONDS = 60;
 
 function decodeValue(raw) {
@@ -17,6 +17,8 @@ function equalHex(a, b) {
 /**
  * Проверяет MAX WebApp initData по алгоритму dev.max.ru/docs/webapps/validation.
  * initDataUnsafe никогда не является источником доверенной identity.
+ * По умолчанию принимаются данные не старше одного часа — это рекомендуемое
+ * MAX окно свежести; при необходимости его можно сузить через env.
  */
 export function verifyMaxInitData(raw, {
   botToken = process.env.BOT_TOKEN || '',
