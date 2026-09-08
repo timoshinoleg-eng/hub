@@ -42,9 +42,17 @@ export function track(action, game = null, value = null) {
 
   if (ENDPOINT) {
     const body = JSON.stringify(ev);
-    navigator.sendBeacon
-      ? navigator.sendBeacon(ENDPOINT, body)
-      : fetch(ENDPOINT, { method: 'POST', body, keepalive: true }).catch(() => {});
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon(ENDPOINT, blob);
+    } else {
+      fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        keepalive: true,
+      }).catch(() => {});
+    }
   }
 
   if (location.search.includes('debug=1')) console.log('[track]', ev);

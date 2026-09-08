@@ -19,6 +19,7 @@
   var cfg = null;
   var last = null;
   var finished = false;
+  var started = false;
 
   function send(msg) {
     msg.__hub = 1;
@@ -32,6 +33,7 @@
   window.confirm = function () { return false; };
 
   window.addEventListener('message', function (e) {
+    if (e.source !== parent) return;
     var d = e.data;
     if (!d || d.__hub !== 1 || d.type !== 'cfg' || d.game !== game) return;
     cfg = d.cfg || {};
@@ -45,6 +47,9 @@
   }
 
   function start() {
+    if (started) return;
+    started = true;
+
     if (cfg.injectCss) {
       var s = document.createElement('style');
       s.textContent = cfg.injectCss;
@@ -86,9 +91,8 @@
         send({ type: 'finish', score: last });
       }
     }, 400);
-
-    send({ type: 'ready' });
   }
 
+  // Handshake одноразовый: родитель отвечает cfg, повторный cfg идемпотентен.
   send({ type: 'ready' });
 })();
