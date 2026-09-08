@@ -22,6 +22,8 @@ jobs:
         run: npm run check
       - name: Product and playability contract
         run: npm run smoke:product
+      - name: UI state contract
+        run: npm run smoke:ui-state
       - name: Iframe bridge contract
         run: npm run smoke:bridge
       - name: Analytics transport and privacy
@@ -44,3 +46,46 @@ jobs:
         run: npm run smoke:daily
       - name: Duel logic
         run: npm run smoke:duel
+  visual-snapshots:
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Render exact-build mobile screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p visual-snapshots
+          # Snapshot the exact production shell while omitting only the remote MAX SDK.
+          # The SDK is separately covered by Bridge contracts; removing it here prevents
+          # an unavailable CDN from delaying DOMContentLoaded in an offline CI browser.
+          sed '/st.max.ru\/js\/max-web-app.js/d' index.html > _visual-index.html
+          cat > _visual-reaction.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#app{margin:0;width:100%;height:100%;border:0;background:#090b14;overflow:hidden}</style><iframe id="app" src="/_visual-index.html"></iframe><script>const app=document.getElementById('app');app.addEventListener('load',()=>setTimeout(()=>{const d=app.contentDocument;d.querySelector('[data-id="reaction"]')?.click();setTimeout(()=>{const g=d.querySelector('#game-frame');g?.contentDocument?.querySelector('#start')?.click()},900)},350));</script>
+          HTML
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/hub-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          "$CHROME" --headless --no-sandbox --disable-gpu --virtual-time-budget=1800 --dump-dom http://127.0.0.1:4173/_visual-index.html > /tmp/menu-dom.html
+          grep -q 'class="gcard' /tmp/menu-dom.html
+          render() {
+            local size="$1" out="$2" url="$3" budget="$4"
+            "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size="$size" --virtual-time-budget="$budget" --screenshot="$out" "$url"
+          }
+          render 360,640 visual-snapshots/menu-360x640.png http://127.0.0.1:4173/_visual-index.html 1800
+          render 390,844 visual-snapshots/menu-390x844.png http://127.0.0.1:4173/_visual-index.html 1800
+          render 360,640 visual-snapshots/reaction-360x640.png http://127.0.0.1:4173/_visual-reaction.html 4200
+          render 390,844 visual-snapshots/reaction-390x844.png http://127.0.0.1:4173/_visual-reaction.html 4200
+          file visual-snapshots/*.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-${{ github.event.pull_request.head.sha || github.sha }}
+          path: visual-snapshots/*.png
+          if-no-files-found: error
+          retention-days: 7
