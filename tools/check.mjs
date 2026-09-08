@@ -47,6 +47,8 @@ for (const [actual, canonical] of [
   ['games/reaction/style.css', 'tools/overrides/reaction-style.css'],
   ['games/snake/index.html', 'tools/overrides/snake-index.html'],
   ['games/snake/style.css', 'tools/overrides/snake-style.css'],
+  ['games/snake/script.js', 'tools/overrides/snake-script.js'],
+  ['games/sapper/style.css', 'tools/overrides/sapper-style.css'],
   ['games/echo/style.css', 'tools/overrides/echo-style.css'],
   ['games/memory/style.css', 'tools/overrides/memory-style.css'],
 ]) {
