@@ -32,6 +32,8 @@ jobs:
         run: npm run smoke:merge
       - name: Daily timezone boundary
         run: npm run smoke:daily-seed
+      - name: Privacy-safe engagement
+        run: npm run smoke:engagement
       - name: Local progression
         run: npm run smoke:progress
       - name: Server contracts
