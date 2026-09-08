@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GAMES } from '../js/games.js';
@@ -14,18 +14,24 @@ for (const g of GAMES) {
   assert.ok(g.accent && g.accent2, `${g.id}: visual accent metadata`);
   assert.ok(g.genre && g.length, `${g.id}: genre and session length metadata`);
   assert.ok(g.howTo && g.howTo.length >= 20, `${g.id}: first-run onboarding copy`);
+  assert.ok(g.icon?.endsWith('.svg') && existsSync(join(ROOT,g.icon)), `${g.id}: local branded SVG icon`);
 }
 assert.ok(GAMES.filter((g) => g.cfg?.daily).length >= 2, 'at least two daily-capable games');
 assert.equal(GAMES.find((g) => g.id === 'memory')?.cfg?.higherIsBetter, false, 'memory keeps lower-is-better scoring');
+assert.match(GAMES.find((g)=>g.id==='quiz')?.tagline||'', /10/, 'quiz card reflects ten-question session');
 
 const hub = read('js/main.js');
 const hubCss = read('css/hub.css');
+const boot = read('games/_boot.js');
 assert.ok(hub.includes("from './progress.js'"), 'hub has local progression');
 assert.ok(hub.includes("from './engagement.js'") && hub.includes('observeVisit()'), 'privacy-safe engagement is wired into production shell');
 assert.ok(hub.includes("track('new_record'") && hub.includes("track('daily_complete'"), 'record and daily retention events');
 assert.ok(hub.includes("track('return_visit'") && hub.includes("track('first_visit'"), 'return/first visit events are emitted by the shell');
 assert.ok(hub.includes("bridge.haptic('selection')"), 'MAX haptic feedback stays integrated');
-for (const token of ['daily-card', 'game-grid', 'record-pill', 'game-tip', 'confetti']) assert.ok(hubCss.includes(token), `shell keeps ${token} visual layer`);
+assert.ok(hub.includes("g.id!==daily?.id"), 'daily hero is not duplicated in the game grid');
+assert.ok(hub.includes("art(g,'result-art')") && hub.includes("art(g)"), 'branded game art is used in shell and results');
+assert.ok(boot.includes("classList.add('hub-embedded')"), 'iframe games receive compact embedded visual mode');
+for (const token of ['daily-card', 'game-grid', 'record-pill', 'game-tip', 'confetti', 'game-art', 'result-art']) assert.ok(hubCss.includes(token), `shell keeps ${token} visual layer`);
 
 const reaction = read('games/reaction/script.js');
 assert.ok(reaction.includes('DURATION=30000') && reaction.includes('combo') && reaction.includes('function pace()'), 'reaction keeps timer/combo/adaptive pace');
