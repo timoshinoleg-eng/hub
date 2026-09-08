@@ -14,7 +14,7 @@ const el=(tag,cls,html)=>{const n=document.createElement(tag);if(cls)n.className
 const state={game:null,score:null,challenge:null,finishMeta:null};
 window.__hubStartParam=bridge.startParam();
 
-function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
 function formatBest(g,best){return best==null?'Рекорда ещё нет':`Рекорд ${best}${g.unit?' '+g.unit:''}`}
 function deepLink(gameId,score){const bot=CFG.bot;if(!bot)return '';const p=score==null?`g${gameId}`:`g${gameId}_s${score}`;return `https://max.ru/${bot}?startapp=${p}`}
 function parseStartParam(sp){const m=/^g([a-z]+)(?:_s(\d+))?$/i.exec(sp||'');if(!m)return null;const game=byId(m[1].toLowerCase());return game?{game,challenge:m[2]?Number(m[2]):null}:null}
@@ -40,11 +40,12 @@ function renderMenu(){
 }
 
 let offBack=()=>{};
+let lastScoreHaptic=0;
 function tipSeen(id){try{return localStorage.getItem('hub_tip_'+id)==='1'}catch{return true}}
 function markTip(id){try{localStorage.setItem('hub_tip_'+id,'1')}catch{}}
 function showGameTip(g){if(!g?.howTo||tipSeen(g.id))return;markTip(g.id);const n=el('div','game-tip');n.innerHTML=`${esc(g.howTo)}<small>Подсказка показывается только один раз</small>`;$('#overlay').appendChild(n);setTimeout(()=>n.remove(),4200)}
 function openGame(id,challenge=null){
-  const g=byId(id);if(!g)return;state.game=g;state.score=null;state.challenge=challenge;state.finishMeta=null;
+  const g=byId(id);if(!g)return;state.game=g;state.score=null;state.challenge=challenge;state.finishMeta=null;lastScoreHaptic=0;
   const pg=getGameProgress(g.id);$('#game-title').textContent=g.title;$('#game-meta').textContent=`${g.genre} · ${formatBest(g,pg.best)}`;$('#game-score').textContent='';
   let src=`games/${g.id}/index.html`;if(g.cfg?.daily)src+='?seed='+dailySeed();if(challenge!=null)src+=(src.includes('?')?'&':'?')+'challenge='+challenge;
   $('#game-frame').src=src;$('#overlay').innerHTML='';document.body.dataset.view='game';track('open_game',g.id);bridge.haptic('selection');offBack();offBack=bridge.onBack(backToMenu);setTimeout(()=>state.game?.id===g.id&&showGameTip(g),500);
@@ -54,7 +55,10 @@ function onMessage(e){
   const d=e.data;if(!d||d.__hub!==1)return;const f=document.getElementById('game-frame');if(!f||e.source!==f.contentWindow)return;
   if(d.type==='ready'){if(!state.game||d.game!==state.game.id)return;f.contentWindow.postMessage({__hub:1,type:'cfg',game:d.game,cfg:state.game.cfg||{}},'*');return}
   if(!state.game)return;
-  if(d.type==='score'){state.score=d.value;$('#game-score').textContent=d.value;return}
+  if(d.type==='score'){
+    const hadScore=state.score!=null;const changed=String(state.score)!==String(d.value);state.score=d.value;$('#game-score').textContent=d.value;
+    const now=performance.now();if(hadScore&&changed&&now-lastScoreHaptic>140){bridge.haptic('selection');lastScoreHaptic=now}return;
+  }
   if(d.type==='finish'){
     state.score=d.score??state.score;const today=dailySeed();state.finishMeta=recordFinish(state.game,state.score??0,today);
     track('finish',state.game.id,state.score);if(state.finishMeta.newBest)track('new_record',state.game.id,state.score);if(state.finishMeta.dailyAdvanced)track('daily_complete',state.game.id,state.finishMeta.streak);showResult();
