@@ -32,9 +32,7 @@ for (const id of readdirSync(GAMES)) {
 
   for (const name of readdirSync(dir).filter((f) => f.endsWith('.css'))) {
     const css = readFileSync(join(dir, name), 'utf8');
-    if (/(?:@import\s+[^;]*https?:\/\/|url\(\s*["']?https?:\/\/)/i.test(css)) {
-      err(`${id}/${name}: внешний CSS runtime-ресурс запрещён`);
-    }
+    if (/(?:@import\s+[^;]*https?:\/\/|url\(\s*["']?https?:\/\/)/i.test(css)) err(`${id}/${name}: внешний CSS runtime-ресурс запрещён`);
   }
   console.log(`  ok ${id}`);
 }
@@ -42,11 +40,15 @@ for (const id of readdirSync(GAMES)) {
 for (const [actual, canonical] of [
   ['games/merge/script.js', 'tools/overrides/merge-script.js'],
   ['games/merge/index.html', 'tools/overrides/merge-index.html'],
+  ['games/merge/style.css', 'tools/overrides/merge-style.css'],
   ['games/quiz/script.js', 'tools/overrides/quiz-script.js'],
+  ['games/quiz/style.css', 'tools/overrides/quiz-style.css'],
   ['games/reaction/index.html', 'tools/overrides/reaction-index.html'],
   ['games/reaction/style.css', 'tools/overrides/reaction-style.css'],
   ['games/snake/index.html', 'tools/overrides/snake-index.html'],
   ['games/snake/style.css', 'tools/overrides/snake-style.css'],
+  ['games/echo/style.css', 'tools/overrides/echo-style.css'],
+  ['games/memory/style.css', 'tools/overrides/memory-style.css'],
 ]) {
   if (readFileSync(join(ROOT, actual), 'utf8') !== readFileSync(join(ROOT, canonical), 'utf8')) {
     err(`${actual}: расходится с production override; npm run vendor будет нерепродуцируем`);
