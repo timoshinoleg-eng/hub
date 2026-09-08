@@ -15,7 +15,7 @@ const el=(tag,cls,html)=>{const n=document.createElement(tag);if(cls)n.className
 const state={game:null,score:null,challenge:null,finishMeta:null};
 window.__hubStartParam=bridge.startParam();
 
-function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
 function art(g,cls='game-art'){return `<img class="${cls}" src="${esc(g.icon||'')}" alt="" aria-hidden="true">`}
 function formatBest(g,best){return best==null?'Рекорда ещё нет':`Рекорд ${best}${g.unit?' '+g.unit:''}`}
 function deepLink(gameId,score){const bot=CFG.bot;if(!bot)return '';const p=score==null?`g${gameId}`:`g${gameId}_s${score}`;return `https://max.ru/${bot}?startapp=${p}`}
@@ -37,7 +37,7 @@ function renderMenu(){
     card.innerHTML=`<div class="gcard-top"><span class="ge">${art(g)}</span><span class="gbadge ${g.cfg?.daily?'daily':''}">${g.cfg?.daily?'✦ DAILY':esc(g.genre||g.length)}</span></div><span class="gt"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span><span class="gfoot"><span class="gbest">${esc(pg.best==null?g.length:formatBest(g,pg.best))}</span><span class="garrow">›</span></span>`;
     card.addEventListener('click',()=>openGame(g.id));list.appendChild(card);
   }
-  $('#count').textContent=`${all.length} игр · ${catalog.length} ниже`;
+  $('#count').textContent=daily?`${catalog.length} игр + вызов`:`${catalog.length} игр`;
   $('#progress-strip').innerHTML=`<div class="pstat"><strong>${summary.finishes}</strong><span>завершено игр</span></div><div class="pstat"><strong>${summary.records}</strong><span>личных рекордов</span></div><div class="pstat"><strong>${summary.streak}</strong><span>дней подряд</span></div>`;
 }
 
@@ -50,12 +50,12 @@ function openGame(id,challenge=null){
   const g=byId(id);if(!g)return;state.game=g;state.score=null;state.challenge=challenge;state.finishMeta=null;lastScoreHaptic=0;
   const pg=getGameProgress(g.id);document.documentElement.style.setProperty('--active-game',g.accent||'#6f63ff');$('#game-title').textContent=g.title;$('#game-meta').textContent=`${g.genre} · ${formatBest(g,pg.best)}`;$('#game-score').textContent='';
   let src=`games/${g.id}/index.html`;if(g.cfg?.daily)src+='?seed='+dailySeed();if(challenge!=null)src+=(src.includes('?')?'&':'?')+'challenge='+challenge;
-  $('#game-frame').src=src;$('#overlay').innerHTML='';document.body.dataset.view='game';track('open_game',g.id);bridge.haptic('selection');offBack();offBack=bridge.onBack(backToMenu);setTimeout(()=>state.game?.id===g.id&&showGameTip(g),500);
+  const frame=$('#game-frame');frame.classList.add('loading');frame.src=src;$('#overlay').innerHTML='';document.body.dataset.view='game';track('open_game',g.id);bridge.haptic('selection');offBack();offBack=bridge.onBack(backToMenu);setTimeout(()=>state.game?.id===g.id&&showGameTip(g),500);
 }
 function backToMenu(){offBack();offBack=()=>{};$('#game-frame').src='about:blank';$('#game-score').textContent='';document.body.dataset.view='menu';state.game=null;state.challenge=null;renderMenu();track('back_to_menu')}
 function onMessage(e){
   const d=e.data;if(!d||d.__hub!==1)return;const f=document.getElementById('game-frame');if(!f||e.source!==f.contentWindow)return;
-  if(d.type==='ready'){if(!state.game||d.game!==state.game.id)return;f.contentWindow.postMessage({__hub:1,type:'cfg',game:d.game,cfg:state.game.cfg||{}},'*');return}
+  if(d.type==='ready'){if(!state.game||d.game!==state.game.id)return;f.contentWindow.postMessage({__hub:1,type:'cfg',game:d.game,cfg:state.game.cfg||{}},'*');requestAnimationFrame(()=>f.classList.remove('loading'));return}
   if(!state.game)return;
   if(d.type==='score'){
     const hadScore=state.score!=null;const changed=String(state.score)!==String(d.value);state.score=d.value;$('#game-score').textContent=d.value;
