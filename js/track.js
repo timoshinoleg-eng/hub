@@ -1,3 +1,5 @@
+import { observeVisit } from './engagement.js';
+
 /**
  * Сборщик событий. До согласия события полностью анонимны. После согласия
  * подписанный MAX initData передаётся серверу только для проверки identity;
@@ -20,22 +22,46 @@ function initData() {
   return typeof raw === 'string' ? raw : '';
 }
 
-export function track(action, game = null, value = null) {
-  const ev = { game, action, value, ts: Date.now(), sp: window.__hubStartParam || '' };
+function event(action, game = null, value = null) {
+  return { game, action, value, ts: Date.now(), sp: window.__hubStartParam || '' };
+}
+
+function persist(ev) {
   try {
     const all = JSON.parse(localStorage.getItem(KEY) || '[]');
     all.push(ev);
     localStorage.setItem(KEY, JSON.stringify(all.slice(-2000)));
   } catch { /* private mode */ }
+}
 
-  if (ENDPOINT) {
-    const signed = hasConsent() ? initData() : '';
-    const wire = signed ? { ...ev, init_data: signed } : ev;
-    const body = JSON.stringify(wire);
-    if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
-    else fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
-  }
+function send(ev) {
+  if (!ENDPOINT) return;
+  const signed = hasConsent() ? initData() : '';
+  const wire = signed ? { ...ev, init_data: signed } : ev;
+  const body = JSON.stringify(wire);
+  if (navigator.sendBeacon) navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+  else fetch(ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+}
+
+function emit(ev) {
+  persist(ev);
+  send(ev);
   if (location.search.includes('debug=1')) console.log('[track]', ev);
+}
+
+export function track(action, game = null, value = null) {
+  const ev = event(action, game, value);
+  emit(ev);
+
+  // Retention без persistent anonymous id: хранится только дата предыдущего
+  // запуска. Сервер видит факт возвратной сессии и gap в днях, но не может
+  // связать анонимные визиты одного человека между собой.
+  if (action === 'open_bot') {
+    const visit = observeVisit();
+    if (visit.firstVisit) emit(event('first_visit'));
+    else if (visit.returning) emit(event('return_visit', null, visit.daysAway));
+  }
+
   return ev;
 }
 
