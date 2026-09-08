@@ -5,6 +5,13 @@ import { duelResult } from './duel.js';
 import { dailySeed } from './daily.js';
 import { observeVisit } from './engagement.js';
 import { getGameProgress, getSummary, recordFinish } from './progress.js';
+import {
+  challengeIntroText,
+  challengeResultState,
+  dailyHeroState,
+  dailyResultText,
+  recordBadgeText,
+} from './ui-state.js';
 import { GAMES, byId, visible } from './games.js';
 
 const CFG = window.HUB_CONFIG || {};
@@ -64,22 +71,33 @@ function renderMenu() {
 
   if (daily) {
     const pg = getGameProgress(daily.id);
+    const heroState = dailyHeroState(pg, today, summary.completedToday);
     $('#daily-card').innerHTML =
-      `<div class="daily-card" style="--d1:${daily.accent};--d2:${daily.accent2}">` +
+      `<div class="daily-card${heroState.completed ? ' is-complete' : ''}" style="--d1:${daily.accent};--d2:${daily.accent2}">` +
         `<div class="daily-top"><span class="daily-label">✦ ВЫЗОВ ДНЯ</span>` +
-        `<span class="daily-status">${summary.completedToday ? '✓ серия сохранена' : 'новый шанс сегодня'}</span></div>` +
+        `<span class="daily-status">${esc(heroState.status)}</span></div>` +
         `<div class="daily-main"><div class="daily-emoji">${iconSvg(daily.icon, 'daily-icon')}</div>` +
         `<div class="daily-copy"><h2>${esc(daily.title)}</h2>` +
         `<p>${esc(daily.tagline)} · ${esc(formatBest(daily, pg.best))}</p></div></div>` +
-        `<button class="daily-play" id="daily-play">${summary.completedToday ? 'Сыграть ещё раз' : 'Играть сейчас'}</button>` +
+        `<button class="daily-play" id="daily-play">${esc(heroState.cta)}</button>` +
       `</div>`;
     $('#daily-play').onclick = () => openGame(daily.id);
   }
 
-  $('#progress-strip').innerHTML =
-    `<div class="pstat"><strong>${summary.finishes}</strong><span>завершено игр</span></div>` +
-    `<div class="pstat"><strong>${summary.records}</strong><span>личных рекордов</span></div>` +
-    `<div class="pstat"><strong>${summary.streak}</strong><span>дней подряд</span></div>`;
+  const progress = $('#progress-strip');
+  if (summary.finishes === 0) {
+    progress.classList.add('is-empty');
+    progress.innerHTML =
+      `<div class="progress-first"><span class="progress-first-mark">1</span>` +
+      `<span><strong>Сыграй первую партию</strong>` +
+      `<small>Рекорд и серия появятся здесь автоматически.</small></span></div>`;
+  } else {
+    progress.classList.remove('is-empty');
+    progress.innerHTML =
+      `<div class="pstat"><strong>${summary.finishes}</strong><span>завершено игр</span></div>` +
+      `<div class="pstat"><strong>${summary.records}</strong><span>личных рекордов</span></div>` +
+      `<div class="pstat"><strong>${summary.streak}</strong><span>дней подряд</span></div>`;
+  }
 
   const list = $('#games');
   list.innerHTML = '';
@@ -113,7 +131,7 @@ function showGameTip(g) {
   if (!g?.howTo || tipSeen(g.id)) return;
   markTip(g.id);
   const n = el('div', 'game-tip');
-  n.innerHTML = `${esc(g.howTo)}<small>Подсказка показывается только один раз</small>`;
+  n.innerHTML = `${esc(g.howTo)}<small>${esc(g.length)} · результат сохранится автоматически</small>`;
   $('#overlay').appendChild(n);
   setTimeout(() => n.remove(), 4200);
 }
@@ -217,17 +235,19 @@ function showResult() {
   const score = state.score ?? 0;
   const meta = state.finishMeta || {};
   const link = deepLink(g.id, score);
-  const duel = duelResult(score, state.challenge, g.cfg?.higherIsBetter !== false);
+  const higherIsBetter = g.cfg?.higherIsBetter !== false;
+  const duel = duelResult(score, state.challenge, higherIsBetter);
+  const duelState = challengeResultState(duel, higherIsBetter);
   const box = el('div', 'result');
 
-  const duelLine = duel
-    ? `<div class="rduel ${duel.won ? 'win' : 'lose'}">${duel.won ? '🏆 Челлендж выигран!' : 'До победы не хватило совсем немного'}</div>`
+  const duelLine = duelState
+    ? `<div class="rduel ${duelState.kind}">${esc(duelState.text)}</div>`
     : '';
   if (duel) track(duel.won ? 'duel_win' : 'duel_lose', g.id, score);
 
-  const dailyLine = meta.dailyAdvanced
-    ? `<div class="rdaily">Серия продлена: ${meta.streak} ${meta.streak === 1 ? 'день' : 'дн.'}</div>`
-    : '';
+  const dailyText = dailyResultText(meta);
+  const dailyLine = dailyText ? `<div class="rdaily">${esc(dailyText)}</div>` : '';
+  const recordBadge = recordBadgeText(meta);
 
   const offerNotify = shouldOfferNotify(dailySeed());
   if (offerNotify) markNotifyPrompted();
@@ -235,7 +255,7 @@ function showResult() {
   box.innerHTML =
     `<div class="rcard" style="--result-glow:${g.accent || '#6d5cff'}">` +
       `${meta.newBest ? confettiHtml() : ''}` +
-      `${meta.newBest ? '<div class="record-pill">✦ НОВЫЙ РЕКОРД</div>' : ''}` +
+      `${recordBadge ? `<div class="record-pill">${esc(recordBadge)}</div>` : ''}` +
       `<div class="result-icon-wrap">${iconSvg(g.icon, 'result-icon')}</div>` +
       `<div class="rttl">${esc(g.title)}</div>` +
       `<div class="result-score">${score}${g.unit ? ` <span style="font-size:14px;letter-spacing:0">${esc(g.unit)}</span>` : ''}</div>` +
@@ -247,7 +267,11 @@ function showResult() {
       `<img class="rimg" alt="карточка результата"><div class="rhint" id="r-hint"></div>` +
     `</div>`;
 
-  box.querySelector('.rimg').src = cardDataUrl({
+  const resultCard = box.querySelector('.rcard');
+  const resultImage = box.querySelector('.rimg');
+  const resultHint = box.querySelector('#r-hint');
+  const shareBtn = box.querySelector('#r-share');
+  resultImage.src = cardDataUrl({
     title: g.title, score, unit: g.unit, hubName: HUB_NAME, accent: g.accent, accent2: g.accent2,
   });
   box.querySelector('#r-again').onclick = () => {
@@ -259,13 +283,20 @@ function showResult() {
     box.remove();
     backToMenu();
   };
-  box.querySelector('#r-share').onclick = async () => {
+  shareBtn.onclick = async () => {
     const ok = await bridge.share(shareText({ title: g.title, score, unit: g.unit, link }), link);
     track(ok ? 'share_ok' : 'share_fallback', g.id, score);
-    if (!ok) {
-      box.querySelector('#r-hint').textContent = 'Шаринг не открылся — карточка результата показана ниже.';
-      box.querySelector('.rimg').style.display = 'block';
+    if (ok) {
+      resultCard.classList.remove('share-fallback');
+      resultHint.textContent = '';
+      resultImage.style.display = 'none';
+      shareBtn.textContent = 'Поделиться';
+      return;
     }
+    resultCard.classList.add('share-fallback');
+    resultHint.textContent = 'Не удалось открыть шаринг. Карточка результата доступна ниже.';
+    resultImage.style.display = 'block';
+    shareBtn.textContent = 'Повторить шаринг';
   };
   const notifyBtn = box.querySelector('#r-notify');
   if (notifyBtn) {
@@ -291,12 +322,15 @@ async function doSubscribe(btn, g, score) {
   if (r.ok) bridge.haptic('notify');
 }
 function showConsent(onAccept) {
-  const box = el('div', 'result');
+  const box = el('div', 'result consent-layer');
+  const policy = CFG.policyUrl
+    ? ` <a href="${CFG.policyUrl}" target="_blank" rel="noopener">Подробнее о данных</a>`
+    : '';
   box.innerHTML =
-    `<div class="rcard"><div class="rttl" style="font-size:18px;color:#fff;margin-bottom:8px">Получать игровые новинки?</div>` +
-    `<p style="margin:0 0 14px;color:var(--mut);font-size:12.5px">Чтобы написать вам в MAX, сервер проверит подписанные данные приложения и сохранит идентификатор пользователя. ` +
-    `<a href="${CFG.policyUrl || '#'}" target="_blank" rel="noopener">Политика обработки данных</a></p>` +
-    `<div class="rrow"><button class="btn primary" id="c-yes">Согласен</button><button class="btn" id="c-no">Не надо</button></div></div>`;
+    `<div class="rcard consent-card"><div class="consent-icon-wrap">${iconSvg('brand', 'consent-icon')}</div>` +
+    `<div class="consent-title">Включить игровые уведомления?</div>` +
+    `<p>MAX передаст серверу подписанные данные приложения. Мы сохраним идентификатор только для отправки игровых новинок.${policy}</p>` +
+    `<div class="rrow"><button class="btn primary" id="c-yes">Включить</button><button class="btn" id="c-no">Не сейчас</button></div></div>`;
   box.querySelector('#c-yes').onclick = () => {
     setConsent();
     track('consent_yes');
@@ -336,10 +370,8 @@ function init() {
     openGame(sp.game.id, sp.challenge);
     if (sp.challenge != null) {
       const higher = sp.game.cfg?.higherIsBetter !== false;
-      const txt = higher
-        ? `Челлендж: набери больше ${sp.challenge}${sp.game.unit ? ' ' + sp.game.unit : ''} 🎯`
-        : `Челлендж: уложись в ${sp.challenge}${sp.game.unit ? ' ' + sp.game.unit : ''} 🎯`;
-      const n = el('div', 'challenge', txt);
+      const txt = challengeIntroText(sp.challenge, higher, sp.game.unit || '');
+      const n = el('div', 'challenge', esc(txt));
       $('#overlay').appendChild(n);
       setTimeout(() => n.remove(), 4000);
     }
