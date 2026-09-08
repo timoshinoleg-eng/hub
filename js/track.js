@@ -1,21 +1,13 @@
 /**
- * Сборщик событий. 5 полей: user_id, game, action, value, ts.
- *
- * Свой, а не Umami / Plausible CE / Matomo: все три — AGPL или GPL,
- * их нельзя встроить в закрытый продукт. Свой собиратель дешевле юрэкспертизы.
- *
- * Пока endpoint не задан, события складываются в localStorage и видны
- * в консоли — этого достаточно для софт-лонча на 100–300 человек.
+ * Сборщик событий. До согласия события полностью анонимны. После согласия
+ * подписанный MAX initData передаётся серверу только для проверки identity;
+ * в localStorage initData и сырой user_id никогда не сохраняются.
  */
 
 const KEY = 'ofeliya_events';
 const ENDPOINT = window.HUB_TRACK_ENDPOINT || '';
 const CONSENT_KEY = 'ofeliya_consent';
 
-/**
- * Сырой идентификатор пользователя не сохраняется в события: сервер
- * хеширует его HMAC-ом с солью. Здесь мы его только передаём по HTTPS.
- */
 export const hasConsent = () => {
   try { return localStorage.getItem(CONSENT_KEY) === '1'; } catch { return false; }
 };
@@ -23,25 +15,31 @@ export const setConsent = () => {
   try { localStorage.setItem(CONSENT_KEY, '1'); } catch { /* ignore */ }
 };
 
+function initData() {
+  const raw = window.WebApp?.initData;
+  return typeof raw === 'string' ? raw : '';
+}
+
 export function track(action, game = null, value = null) {
   const ev = {
-    uid_hash: window.__hubUserId || 'anon',
     game,
     action,
     value,
     ts: Date.now(),
     sp: window.__hubStartParam || '',
-    consent: hasConsent(),
   };
 
+  // Локальная история намеренно не содержит MAX identity или initData.
   try {
     const all = JSON.parse(localStorage.getItem(KEY) || '[]');
     all.push(ev);
     localStorage.setItem(KEY, JSON.stringify(all.slice(-2000)));
-  } catch (e) { /* приватный режим — не критично */ }
+  } catch { /* приватный режим — не критично */ }
 
   if (ENDPOINT) {
-    const body = JSON.stringify(ev);
+    const signed = hasConsent() ? initData() : '';
+    const wire = signed ? { ...ev, init_data: signed } : ev;
+    const body = JSON.stringify(wire);
     if (navigator.sendBeacon) {
       const blob = new Blob([body], { type: 'application/json' });
       navigator.sendBeacon(ENDPOINT, blob);
@@ -59,31 +57,30 @@ export function track(action, game = null, value = null) {
   return ev;
 }
 
-/** Подписка на «уведомить о запуске». Нужен реальный user_id — иначе бот
- *  не сможет отправить сообщение. Отправляем только при явном согласии. */
+/** Подписка на «уведомить о запуске»: identity берётся только из подписанного initData. */
 export async function subscribe(gameId = null) {
   if (!hasConsent()) return { ok: false, reason: 'no_consent' };
-  const userId = window.__hubUserId || '';
-  const numeric = /^\d+$/.test(String(userId)) ? Number(userId) : null;
-  if (!numeric) return { ok: false, reason: 'no_user_id' };
+  if (!ENDPOINT) return { ok: false, reason: 'no_endpoint' };
+  const signed = initData();
+  if (!signed) return { ok: false, reason: 'no_auth' };
 
   try {
     const r = await fetch(ENDPOINT.replace(/\/ev\/?$/, '/sub'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: numeric, game: gameId, consent: true }),
+      body: JSON.stringify({ init_data: signed, game: gameId, consent: true }),
     });
-    return { ok: r.ok };
-  } catch (e) {
+    return { ok: r.ok, status: r.status };
+  } catch {
     return { ok: false, reason: 'network' };
   }
 }
 
 export function dump() {
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
 }
 
-/** Выгрузка в CSV — заменяет дашборд на первые две недели. */
+/** Выгрузка локальной анонимной истории в CSV. */
 export function toCsv() {
   const rows = dump();
   if (!rows.length) return '';

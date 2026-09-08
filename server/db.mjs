@@ -1,15 +1,7 @@
 /**
- * Слой данных. Одно хранилище на сервер событий и бота — иначе рассылка
- * и аналитика разъедутся.
- *
- * Два бэкенда: Postgres (прод) и JSON-файл (софт-лонч без инфраструктуры).
- * Выбор по наличию DATABASE_URL.
- *
- * Про персональные данные: user_id из MAX — это персональные данные по 152-ФЗ.
- * Поэтому в событиях хранится только HMAC-хеш с солью из окружения, а сырой
- * id — отдельно и только в таблице подписок, где он нужен физически,
- * чтобы отправить сообщение. Так аналитику можно хранить долго, а
- * идентификаторы — удалить по первому запросу пользователя.
+ * Слой данных. Postgres — production; JSON — только dev/test.
+ * В событиях хранится HMAC-псевдоним только после подтверждённой identity;
+ * анонимные события получают случайный несвязуемый id.
  */
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -17,7 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const HASH_SALT = process.env.HUB_HASH_SALT || 'change-me-in-production';
+const HASH_SALT = process.env.HUB_HASH_SALT || '';
 const JSON_FILE = process.env.HUB_JSON_DB || join(ROOT, 'server', 'data.json');
 
 let pg = null;
@@ -28,14 +20,16 @@ if (driver === 'pg') {
   pg = new Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
 }
 
-/* ── Хеширование ───────────────────────────────────────────────────────── */
+function assertHashSalt() {
+  if (!HASH_SALT || HASH_SALT === 'change-me-in-production' || HASH_SALT.length < 32) {
+    throw new Error('HUB_HASH_SALT must be a non-default secret of at least 32 characters');
+  }
+}
 
 export const hashUid = (raw) =>
   createHmac('sha256', HASH_SALT).update(String(raw)).digest('hex').slice(0, 32);
 
 export const anonId = () => 'a-' + createHash('sha256').update(randomUUID()).digest('hex').slice(0, 16);
-
-/* ── Схема ─────────────────────────────────────────────────────────────── */
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS hub_events (
@@ -63,7 +57,7 @@ let jsonDb = { events: [], subscribers: [] };
 
 function loadJson() {
   if (existsSync(JSON_FILE)) {
-    try { jsonDb = JSON.parse(readFileSync(JSON_FILE, 'utf8')); } catch { /* начнём с пустого */ }
+    try { jsonDb = JSON.parse(readFileSync(JSON_FILE, 'utf8')); } catch { /* dev: начнём с пустого */ }
   }
 }
 function saveJson() {
@@ -72,11 +66,10 @@ function saveJson() {
 if (driver === 'json') loadJson();
 
 export async function init() {
+  assertHashSalt();
   if (driver === 'pg') await pg.query(DDL);
   return driver;
 }
-
-/* ── События ───────────────────────────────────────────────────────────── */
 
 export async function insertEvent({ uid_hash, game, action, value, sp }) {
   if (driver === 'json') {
@@ -90,8 +83,6 @@ export async function insertEvent({ uid_hash, game, action, value, sp }) {
     [uid_hash, game || null, action, value ?? null, sp || '']
   );
 }
-
-/* ── Подписки на уведомление о запуске ─────────────────────────────────── */
 
 export async function addSubscriber({ user_id, uid_hash, game, chat_id }) {
   if (driver === 'json') {
@@ -116,7 +107,6 @@ export async function listSubscribers() {
   return r.rows;
 }
 
-/** Удаление по запросу пользователя — обязанность по 152-ФЗ. */
 export async function forgetUser(rawUserId) {
   const h = hashUid(rawUserId);
   if (driver === 'json') {
@@ -130,12 +120,6 @@ export async function forgetUser(rawUserId) {
   return true;
 }
 
-/* ── Метрики софт-лонча ────────────────────────────────────────────────── */
-
-/**
- * Действия, которые должны присутствовать в ответе даже с нулём —
- * иначе сводка молча теряет их и метрика выглядит как «не работает».
- */
 const KEY_ACTIONS = [
   'bot_start',
   'open_bot',
@@ -159,9 +143,7 @@ export async function stats() {
     counts.games = games;
     return counts;
   }
-  const r = await pg.query(`
-    SELECT action, count(*)::int AS n FROM hub_events GROUP BY action
-  `);
+  const r = await pg.query(`SELECT action, count(*)::int AS n FROM hub_events GROUP BY action`);
   const g = await pg.query(`
     SELECT game, count(*)::int AS n FROM hub_events WHERE game IS NOT NULL GROUP BY game ORDER BY n DESC
   `);

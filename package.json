@@ -10,23 +10,20 @@
     "bot": "node --env-file=.env bot/index.mjs",
     "vendor": "node tools/vendor.mjs",
     "check": "node tools/check.mjs",
-    "smoke": "node tools/check.mjs && node tools/bridge-contract.mjs && node tools/track-transport.mjs && node server/smoke.mjs && node bot/smoke.mjs && node tools/daily.mjs && node tools/duel.mjs",
+    "smoke": "node tools/check.mjs && node tools/bridge-contract.mjs && node tools/track-transport.mjs && node tools/max-auth.mjs && node server/smoke.mjs && node bot/smoke.mjs && node tools/daily.mjs && node tools/duel.mjs",
     "smoke:bridge": "node tools/bridge-contract.mjs",
     "smoke:track": "node tools/track-transport.mjs",
+    "smoke:auth": "node tools/max-auth.mjs",
     "smoke:server": "node server/smoke.mjs",
     "smoke:bot": "node bot/smoke.mjs",
     "smoke:daily": "node tools/daily.mjs",
     "smoke:duel": "node tools/duel.mjs"
   },
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": { "node": ">=20" },
   "dependencies": {
     "@maxhub/max-bot-api": "^0.3.1",
     "fastify": "^5.2.0",
     "pg": "^8.13.0"
   },
-  "devDependencies": {
-    "pino-pretty": "^13.0.0"
-  }
+  "devDependencies": { "pino-pretty": "^13.0.0" }
 }
