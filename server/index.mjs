@@ -26,7 +26,11 @@ function assertProductionConfig() {
 export async function buildServer({ logger = true } = {}) {
   await db.init();
   const opts = { bodyLimit: 32 * 1024 };
-  if (logger) opts.logger = { transport: { target: 'pino-pretty', options: { translateTime: true } } };
+  if (logger) {
+    opts.logger = process.env.NODE_ENV === 'production'
+      ? true
+      : { transport: { target: 'pino-pretty', options: { translateTime: true } } };
+  }
   const app = Fastify(opts);
   const corsOrigin = process.env.HUB_CORS_ORIGIN || '';
 
@@ -106,7 +110,7 @@ if (isDirectRun) {
     const PORT = Number(process.env.PORT || 8787);
     const app = await buildServer();
     await app.listen({ port: PORT, host: '0.0.0.0' });
-    console.log(`Сервер событий: http://127.0.0.1:${PORT} · хранилище: ${db.driver}`);
+    console.log(`Сервер событий запущен на порту ${PORT} · хранилище: ${db.driver}`);
   } catch (e) {
     console.error(e?.message || e);
     process.exit(1);
