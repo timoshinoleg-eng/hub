@@ -14,7 +14,7 @@ const el=(tag,cls,html)=>{const n=document.createElement(tag);if(cls)n.className
 const state={game:null,score:null,challenge:null,finishMeta:null};
 window.__hubStartParam=bridge.startParam();
 
-function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function formatBest(g,best){return best==null?'Рекорда ещё нет':`Рекорд ${best}${g.unit?' '+g.unit:''}`}
 function deepLink(gameId,score){const bot=CFG.bot;if(!bot)return '';const p=score==null?`g${gameId}`:`g${gameId}_s${score}`;return `https://max.ru/${bot}?startapp=${p}`}
 function parseStartParam(sp){const m=/^g([a-z]+)(?:_s(\d+))?$/i.exec(sp||'');if(!m)return null;const game=byId(m[1].toLowerCase());return game?{game,challenge:m[2]?Number(m[2]):null}:null}
