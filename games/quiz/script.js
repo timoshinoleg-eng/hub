@@ -58,12 +58,10 @@ function displayQuestion() {
   const questionElement = document.createElement("div");
   questionElement.className = "question";
   questionElement.textContent = `${currentQuestion + 1}. ${questionData.question}`;
-
   const optionsElement = document.createElement("div");
   optionsElement.className = "options";
   const shuffledOptions = [...questionData.options];
   shuffleArray(shuffledOptions);
-
   for (const value of shuffledOptions) {
     const option = document.createElement("label");
     option.className = "option";
@@ -75,7 +73,6 @@ function displayQuestion() {
     option.appendChild(document.createTextNode(value));
     optionsElement.appendChild(option);
   }
-
   quizContainer.innerHTML = "";
   quizContainer.appendChild(questionElement);
   quizContainer.appendChild(optionsElement);
@@ -135,6 +132,5 @@ function showAnswer() {
 submitButton.addEventListener("click", checkAnswer);
 retryButton.addEventListener("click", retryQuiz);
 showAnswerButton.addEventListener("click", showAnswer);
-
 shuffleArray(quizData);
 displayQuestion();
