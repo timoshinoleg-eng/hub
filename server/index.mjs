@@ -23,6 +23,17 @@ function assertProductionConfig() {
   if (problems.length) throw new Error(`Unsafe production config: ${problems.join('; ')}`);
 }
 
+function bodyObject(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch { /* invalid payload handled by route validation */ }
+  }
+  return {};
+}
+
 export async function buildServer({ logger = true } = {}) {
   await db.init();
   const opts = { bodyLimit: 32 * 1024 };
@@ -37,6 +48,7 @@ export async function buildServer({ logger = true } = {}) {
   app.addHook('onRequest', async (req, reply) => {
     if (corsOrigin && req.headers.origin === corsOrigin) {
       reply.header('Access-Control-Allow-Origin', corsOrigin);
+      reply.header('Access-Control-Allow-Credentials', 'true');
       reply.header('Vary', 'Origin');
     }
     reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -47,6 +59,7 @@ export async function buildServer({ logger = true } = {}) {
   const clamp = (s, n) => String(s ?? '').slice(0, n);
   const isAction = (s) => /^[a-z_]{2,32}$/.test(String(s || ''));
   const isGame = (s) => /^[a-z]{2,16}$/.test(String(s || ''));
+  const isSession = (s) => /^s_[A-Za-z0-9_-]{8,61}$/.test(String(s || ''));
   const verifyBody = (b) => verifyMaxInitData(typeof b?.init_data === 'string' ? b.init_data : '');
   const isAdmin = (req) => {
     const expected = process.env.HUB_ADMIN_TOKEN || '';
@@ -55,7 +68,7 @@ export async function buildServer({ logger = true } = {}) {
   };
 
   app.post('/ev', async (req, reply) => {
-    const b = req.body || {};
+    const b = bodyObject(req.body);
     if (!isAction(b.action)) return reply.code(400).send({ error: 'bad action' });
     let uid_hash = db.anonId();
     if (typeof b.init_data === 'string' && b.init_data) {
@@ -65,6 +78,7 @@ export async function buildServer({ logger = true } = {}) {
     }
     await db.insertEvent({
       uid_hash,
+      session_id: isSession(b.sid) ? b.sid : null,
       game: isGame(b.game) ? b.game : null,
       action: b.action,
       value: Number.isFinite(Number(b.value)) ? Number(b.value) : null,
@@ -74,7 +88,7 @@ export async function buildServer({ logger = true } = {}) {
   });
 
   app.post('/sub', async (req, reply) => {
-    const b = req.body || {};
+    const b = bodyObject(req.body);
     if (b.consent !== true) return reply.code(400).send({ error: 'consent_required' });
     const auth = verifyBody(b);
     if (!auth.ok) return reply.code(401).send({ error: 'bad init_data', reason: auth.reason });
@@ -84,7 +98,8 @@ export async function buildServer({ logger = true } = {}) {
   });
 
   app.post('/forget', async (req, reply) => {
-    const auth = verifyBody(req.body || {});
+    const b = bodyObject(req.body);
+    const auth = verifyBody(b);
     if (!auth.ok) return reply.code(401).send({ error: 'bad init_data', reason: auth.reason });
     await db.forgetUser(auth.user.id);
     return { ok: true };

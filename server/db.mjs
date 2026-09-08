@@ -33,15 +33,18 @@ export const anonId = () => 'a-' + createHash('sha256').update(randomUUID()).dig
 
 const DDL = `
 CREATE TABLE IF NOT EXISTS hub_events (
-  id        bigserial PRIMARY KEY,
-  uid_hash  varchar(32)  NOT NULL,
-  game      varchar(32),
-  action    varchar(48)  NOT NULL,
-  value     integer,
-  sp        varchar(64),
-  ts        timestamptz  NOT NULL DEFAULT now()
+  id          bigserial PRIMARY KEY,
+  uid_hash    varchar(32)  NOT NULL,
+  session_id  varchar(64),
+  game        varchar(32),
+  action      varchar(48)  NOT NULL,
+  value       integer,
+  sp          varchar(64),
+  ts          timestamptz  NOT NULL DEFAULT now()
 );
+ALTER TABLE hub_events ADD COLUMN IF NOT EXISTS session_id varchar(64);
 CREATE INDEX IF NOT EXISTS hub_events_game_idx ON hub_events (game, action);
+CREATE INDEX IF NOT EXISTS hub_events_session_idx ON hub_events (session_id, action);
 
 CREATE TABLE IF NOT EXISTS hub_subscribers (
   user_id   bigint PRIMARY KEY,
@@ -71,16 +74,16 @@ export async function init() {
   return driver;
 }
 
-export async function insertEvent({ uid_hash, game, action, value, sp }) {
+export async function insertEvent({ uid_hash, session_id = null, game, action, value, sp }) {
   if (driver === 'json') {
-    jsonDb.events.push({ uid_hash, game, action, value, sp, ts: new Date().toISOString() });
+    jsonDb.events.push({ uid_hash, session_id, game, action, value, sp, ts: new Date().toISOString() });
     if (jsonDb.events.length > 50000) jsonDb.events = jsonDb.events.slice(-50000);
     saveJson();
     return;
   }
   await pg.query(
-    `INSERT INTO hub_events (uid_hash, game, action, value, sp) VALUES ($1,$2,$3,$4,$5)`,
-    [uid_hash, game || null, action, value ?? null, sp || '']
+    `INSERT INTO hub_events (uid_hash, session_id, game, action, value, sp) VALUES ($1,$2,$3,$4,$5,$6)`,
+    [uid_hash, session_id || null, game || null, action, value ?? null, sp || '']
   );
 }
 
@@ -121,46 +124,40 @@ export async function forgetUser(rawUserId) {
 }
 
 const KEY_ACTIONS = [
-  'bot_start',
-  'open_bot',
-  'first_visit',
-  'return_visit',
-  'open_game',
-  'finish',
-  'replay',
-  'share_ok',
-  'new_record',
-  'daily_complete',
-  'notify_subscribe',
-  'bot_pick_game',
+  'bot_start', 'open_bot', 'first_visit', 'return_visit', 'open_game', 'finish',
+  'replay', 'share_ok', 'new_record', 'daily_complete', 'notify_subscribe', 'bot_pick_game',
 ];
 
 const pct = (n, d) => d > 0 ? Math.round((Number(n || 0) / Number(d)) * 1000) / 10 : 0;
 
-function buildFunnel(counts, nextDayReturns = 0) {
-  const opens = Number(counts.open_bot || 0);
+function buildFunnel(counts, nextDayReturns = 0, sessionStats = null) {
+  const eventOpens = Number(counts.open_bot || 0);
   const starts = Number(counts.open_game || 0);
   const finishes = Number(counts.finish || 0);
   const replays = Number(counts.replay || 0);
   const shares = Number(counts.share_ok || 0);
-  const returns = Number(counts.return_visit || 0);
   const daily = Number(counts.daily_complete || 0);
+  const opens = sessionStats ? Number(sessionStats.open_sessions || 0) : eventOpens;
+  const gameSessions = sessionStats ? Number(sessionStats.game_sessions || 0) : Math.min(starts, opens);
+  const firstSessions = sessionStats ? Number(sessionStats.first_visit_sessions || 0) : Number(counts.first_visit || 0);
+  const returningSessions = sessionStats ? Number(sessionStats.returning_sessions || 0) : Number(counts.return_visit || 0);
   return {
     open_sessions: opens,
-    first_visit_sessions: Number(counts.first_visit || 0),
-    returning_sessions: returns,
+    sessions_with_game: gameSessions,
+    first_visit_sessions: firstSessions,
+    returning_sessions: returningSessions,
     next_day_return_events: Number(nextDayReturns || 0),
     game_starts: starts,
     finishes,
     replays,
     shares,
     daily_completions: daily,
-    start_rate_pct: pct(starts, opens),
+    start_rate_pct: pct(gameSessions, opens),
     completion_rate_pct: pct(finishes, starts),
     finish_per_open_pct: pct(finishes, opens),
     replay_rate_pct: pct(replays, finishes),
     share_rate_pct: pct(shares, finishes),
-    returning_session_share_pct: pct(returns, opens),
+    returning_session_share_pct: pct(returningSessions, opens),
     daily_completion_share_pct: pct(daily, opens),
   };
 }
@@ -204,6 +201,20 @@ function gameFunnelFromRows(rows) {
   return finalizeGameFunnel(out);
 }
 
+function sessionStatsFromEvents(events) {
+  const opens = new Set(events.filter((e) => e.action === 'open_bot' && e.session_id).map((e) => e.session_id));
+  if (!opens.size) return null;
+  const inOpenSessions = (action) => new Set(events
+    .filter((e) => e.action === action && e.session_id && opens.has(e.session_id))
+    .map((e) => e.session_id)).size;
+  return {
+    open_sessions: opens.size,
+    game_sessions: inOpenSessions('open_game'),
+    first_visit_sessions: inOpenSessions('first_visit'),
+    returning_sessions: inOpenSessions('return_visit'),
+  };
+}
+
 function normalizedDays(days) {
   const n = Number(days);
   return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 0;
@@ -229,7 +240,7 @@ export async function stats({ days = 0 } = {}) {
     counts.subscribers = jsonDb.subscribers.filter((s) => s.consent).length;
     counts.games = games;
     counts.window_days = days;
-    counts.funnel = buildFunnel(counts, nextDayReturns);
+    counts.funnel = buildFunnel(counts, nextDayReturns, sessionStatsFromEvents(events));
     counts.game_funnel = gameFunnelFromEvents(events);
     return counts;
   }
@@ -238,8 +249,7 @@ export async function stats({ days = 0 } = {}) {
   const params = days ? [days] : [];
   const r = await pg.query(`SELECT action, count(*)::int AS n FROM hub_events WHERE ${where} GROUP BY action`, params);
   const g = await pg.query(`
-    SELECT game, count(*)::int AS n FROM hub_events
-    WHERE ${where} AND game IS NOT NULL GROUP BY game ORDER BY n DESC
+    SELECT game, count(*)::int AS n FROM hub_events WHERE ${where} AND game IS NOT NULL GROUP BY game ORDER BY n DESC
   `, params);
   const gf = await pg.query(`
     SELECT game, action, count(*)::int AS n FROM hub_events
@@ -250,13 +260,24 @@ export async function stats({ days = 0 } = {}) {
     SELECT count(*)::int AS n FROM hub_events
     WHERE ${where} AND action = 'return_visit' AND value = 1
   `, params);
+  const sm = await pg.query(`
+    WITH scoped AS (SELECT session_id, action FROM hub_events WHERE ${where}),
+    opens AS (SELECT DISTINCT session_id FROM scoped WHERE action = 'open_bot' AND session_id IS NOT NULL)
+    SELECT
+      (SELECT count(*)::int FROM opens) AS open_sessions,
+      count(DISTINCT session_id) FILTER (WHERE action = 'open_game' AND session_id IN (SELECT session_id FROM opens))::int AS game_sessions,
+      count(DISTINCT session_id) FILTER (WHERE action = 'first_visit' AND session_id IN (SELECT session_id FROM opens))::int AS first_visit_sessions,
+      count(DISTINCT session_id) FILTER (WHERE action = 'return_visit' AND session_id IN (SELECT session_id FROM opens))::int AS returning_sessions
+    FROM scoped
+  `, params);
   const s = await pg.query(`SELECT count(*)::int AS n FROM hub_subscribers WHERE consent = true`);
 
   const out = { subscribers: s.rows[0].n, games: {}, window_days: days };
   for (const a of KEY_ACTIONS) out[a] = 0;
   for (const row of r.rows) out[row.action] = row.n;
   for (const row of g.rows) out.games[row.game] = row.n;
-  out.funnel = buildFunnel(out, nd.rows[0]?.n || 0);
+  const sessionStats = Number(sm.rows[0]?.open_sessions || 0) > 0 ? sm.rows[0] : null;
+  out.funnel = buildFunnel(out, nd.rows[0]?.n || 0, sessionStats);
   out.game_funnel = gameFunnelFromRows(gf.rows);
   return out;
 }
@@ -266,8 +287,8 @@ export async function exportCsv() {
     ? jsonDb.events
     : (await pg.query(`SELECT * FROM hub_events ORDER BY ts`)).rows;
   if (!rows.length) return '';
-  const head = ['ts', 'uid_hash', 'game', 'action', 'value', 'sp'].join(',');
-  return [head, ...rows.map((r) => [r.ts, r.uid_hash, r.game, r.action, r.value, r.sp]
+  const head = ['ts', 'uid_hash', 'session_id', 'game', 'action', 'value', 'sp'].join(',');
+  return [head, ...rows.map((r) => [r.ts, r.uid_hash, r.session_id, r.game, r.action, r.value, r.sp]
     .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
 }
 

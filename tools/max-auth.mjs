@@ -13,35 +13,30 @@ function sign(fields, token = BOT_TOKEN) {
 }
 
 const valid = sign({
-  auth_date: String(now - 60),
-  query_id: 'query-1',
-  start_param: 'gmerge_s10',
+  auth_date: String(now - 60), query_id: 'query-1', start_param: 'gmerge_s10',
   user: JSON.stringify({ id: 67890, first_name: 'Max' }),
 });
 
 let fails = 0;
-function ok(cond, msg) {
-  console.log(`${cond ? '✓' : '✗'} ${msg}`);
-  if (!cond) fails++;
-}
+function ok(cond, msg) { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fails++; }
 
-let r = verifyMaxInitData(valid, { botToken: BOT_TOKEN, nowSeconds: now, maxAgeSeconds: 3600 });
+let r = verifyMaxInitData(valid, { botToken: BOT_TOKEN, nowSeconds: now });
 ok(r.ok && r.user.id === 67890 && r.startParam === 'gmerge_s10', 'валидная подпись принимается');
 
-r = verifyMaxInitData(valid.replace('67890', '67891'), { botToken: BOT_TOKEN, nowSeconds: now, maxAgeSeconds: 3600 });
+r = verifyMaxInitData(valid.replace('67890', '67891'), { botToken: BOT_TOKEN, nowSeconds: now });
 ok(!r.ok, 'изменённые данные отклоняются');
 
-r = verifyMaxInitData(sign({ auth_date: String(now - 7200), user: JSON.stringify({ id: 1 }) }), { botToken: BOT_TOKEN, nowSeconds: now, maxAgeSeconds: 3600 });
-ok(!r.ok && r.reason === 'auth_date_expired', 'просроченный initData отклоняется');
+r = verifyMaxInitData(sign({ auth_date: String(now - 3601), user: JSON.stringify({ id: 1 }) }), { botToken: BOT_TOKEN, nowSeconds: now });
+ok(!r.ok && r.reason === 'auth_date_expired', 'default freshness window MAX ограничен одним часом');
 
-r = verifyMaxInitData(valid + '&hash=' + '0'.repeat(64), { botToken: BOT_TOKEN, nowSeconds: now, maxAgeSeconds: 3600 });
+r = verifyMaxInitData(sign({ auth_date: String(now - 7200), user: JSON.stringify({ id: 1 }) }), { botToken: BOT_TOKEN, nowSeconds: now, maxAgeSeconds: 3600 });
+ok(!r.ok && r.reason === 'auth_date_expired', 'явно просроченный initData отклоняется');
+
+r = verifyMaxInitData(valid + '&hash=' + '0'.repeat(64), { botToken: BOT_TOKEN, nowSeconds: now });
 ok(!r.ok && r.reason === 'duplicate_key', 'дубли ключей отклоняются');
 
-r = verifyMaxInitData(valid, { botToken: 'wrong-token', nowSeconds: now, maxAgeSeconds: 3600 });
+r = verifyMaxInitData(valid, { botToken: 'wrong-token', nowSeconds: now });
 ok(!r.ok && r.reason === 'bad_hash', 'неверный bot token не валидирует пользователя');
 
-if (fails) {
-  console.error(`\nПровалено: ${fails}`);
-  process.exit(1);
-}
+if (fails) { console.error(`\nПровалено: ${fails}`); process.exit(1); }
 console.log('\nMAX initData validation проходит контрактные проверки.');

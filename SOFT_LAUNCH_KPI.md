@@ -24,14 +24,15 @@ curl -fsS -H "Authorization: Bearer $HUB_ADMIN_TOKEN" \
 
 ### Метрики funnel
 
-- `open_sessions` — открытия Mini App;
-- `game_starts` — старты игр;
+- `open_sessions` — уникальные ephemeral-сессии открытия Mini App;
+- `sessions_with_game` — сколько из этих сессий дошло хотя бы до одной игры;
+- `game_starts` — число стартов раундов/игр, включая повторы в той же сессии;
 - `finishes` — завершённые раунды;
 - `replays` — нажатия «Ещё раз» после результата;
 - `shares` — успешные share actions;
 - `returning_sessions` — запуск в другой календарный день на том же клиенте;
 - `next_day_return_events` — возвраты ровно через один локальный день;
-- `start_rate_pct = game_starts / open_sessions`;
+- `start_rate_pct = sessions_with_game / open_sessions` — настоящая session conversion, поэтому не должна превышать 100%;
 - `completion_rate_pct = finishes / game_starts`;
 - `replay_rate_pct = replays / finishes`;
 - `share_rate_pct = shares / finishes`;
@@ -43,14 +44,15 @@ curl -fsS -H "Authorization: Bearer $HUB_ADMIN_TOKEN" \
 
 `return_visit` специально **не является классическим D1 retention**.
 
-До согласия приложение не создаёт постоянный anonymous user id. В localStorage хранится только дата последнего визита. При следующем запуске сервер получает факт возвратной сессии и gap в днях, но не может связать два анонимных визита в профиль.
+До согласия приложение не создаёт постоянный anonymous user id. Для корректной воронки каждый запуск Mini App получает случайный ephemeral session id: он создаётся только в памяти текущего открытия, не сохраняется в локальной analytics history и не используется повторно при следующем визите. Отдельно в localStorage хранится только дата последнего визита. При следующем запуске сервер получает факт возвратной сессии и gap в днях, но не может связать два анонимных визита в профиль.
 
 Поэтому:
 
+- `start_rate_pct` корректно измеряет долю открытий, в которых началась хотя бы одна игра;
 - `returning_session_share_pct` — корректная агрегатная метрика возвратных сессий;
 - `next_day_return_events` — количество next-day return signals;
 - нельзя называть эти показатели `D1 unique-user retention`;
-- не добавлять fingerprint/random persistent id только ради более красивой retention-цифры.
+- не добавлять fingerprint или persistent random id только ради более красивой retention-цифры.
 
 ## 3. Soft-launch targets
 

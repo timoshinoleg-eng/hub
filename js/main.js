@@ -3,6 +3,7 @@ import { track, hasConsent, setConsent, subscribe } from './track.js';
 import { cardDataUrl, shareText } from './share.js';
 import { duelResult } from './duel.js';
 import { dailySeed } from './daily.js';
+import { observeVisit } from './engagement.js';
 import { getGameProgress, getSummary, recordFinish } from './progress.js';
 import { GAMES, byId, visible } from './games.js';
 
@@ -80,7 +81,8 @@ function showResult(){
 async function doSubscribe(btn,g,score){const r=await subscribe(g.id);track(r.ok?'notify_subscribe':'notify_failed',g.id,score);btn.textContent=r.ok?'✓ Подписка включена':'Не получилось';btn.disabled=r.ok;if(r.ok)bridge.haptic('notify')}
 function showConsent(onAccept){const box=el('div','result');box.innerHTML=`<div class="rcard"><div class="rttl" style="font-size:18px;color:#fff;margin-bottom:8px">Получать игровые новинки?</div><p style="margin:0 0 14px;color:var(--mut);font-size:12.5px">Чтобы написать вам в MAX, сервер проверит подписанные данные приложения и сохранит идентификатор пользователя. <a href="${CFG.policyUrl||'#'}" target="_blank" rel="noopener">Политика обработки данных</a></p><div class="rrow"><button class="btn primary" id="c-yes">Согласен</button><button class="btn" id="c-no">Не надо</button></div></div>`;box.querySelector('#c-yes').onclick=()=>{setConsent();track('consent_yes');box.remove();onAccept?.()};box.querySelector('#c-no').onclick=()=>{track('consent_no');box.remove()};$('#overlay').appendChild(box)}
 function init(){
-  bridge.ready();bridge.expand();renderMenu();window.addEventListener('message',onMessage);$('#back').addEventListener('click',backToMenu);$('#reload').addEventListener('click',()=>state.game&&openGame(state.game.id,state.challenge));track('open_bot');
+  bridge.ready();bridge.expand();renderMenu();window.addEventListener('message',onMessage);$('#back').addEventListener('click',backToMenu);$('#reload').addEventListener('click',()=>state.game&&openGame(state.game.id,state.challenge));
+  const visit=observeVisit();track('open_bot');if(visit.firstVisit)track('first_visit');else if(visit.returning)track('return_visit',null,visit.daysAway);
   const parts=['Мини-игры в MAX · без рекламы и покупок'];if(CFG.orgName)parts.push(CFG.orgName);const links=[];if(CFG.policyUrl)links.push(`<a href="${CFG.policyUrl}" target="_blank" rel="noopener">Политика</a>`);if(CFG.offerUrl)links.push(`<a href="${CFG.offerUrl}" target="_blank" rel="noopener">Оферта</a>`);$('#legal').innerHTML=parts.join(' · ')+(links.length?'<br>'+links.join(' · '):'');
   const sp=parseStartParam(window.__hubStartParam);if(sp){track('deep_link_open',sp.game.id,sp.challenge);openGame(sp.game.id,sp.challenge);if(sp.challenge!=null){const higher=sp.game.cfg?.higherIsBetter!==false;const txt=higher?`Челлендж: набери больше ${sp.challenge}${sp.game.unit?' '+sp.game.unit:''} 🎯`:`Челлендж: уложись в ${sp.challenge}${sp.game.unit?' '+sp.game.unit:''} 🎯`;const n=el('div','challenge',txt);$('#overlay').appendChild(n);setTimeout(()=>n.remove(),4000)}}
   if(!CFG.bot)console.warn('[hub] HUB_CONFIG.bot не задан — deep link в шаринге работать не будет');

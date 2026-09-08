@@ -50,18 +50,23 @@ export const bridge = {
   },
 
   async share(text, link) {
-    const payload = { text: link ? `${text}\n${link}` : text };
+    const payload = link ? { text, link } : { text };
+    if (has('shareMaxContent')) {
+      try { get('shareMaxContent')(payload); return true; } catch { /* fallthrough */ }
+    }
     if (has('shareContent')) {
       try { get('shareContent')(payload); return true; } catch { /* fallthrough */ }
     }
-    if (has('openLink')) {
-      try {
-        get('openLink')(`https://max.ru/:share?text=${encodeURIComponent(payload.text)}`);
-        return true;
-      } catch { /* fallthrough */ }
+    const combined = link ? `${text}\n${link}` : text;
+    const maxShareUrl = `https://max.ru/:share?text=${encodeURIComponent(combined)}`;
+    if (has('openMaxLink')) {
+      try { get('openMaxLink')(maxShareUrl); return true; } catch { /* fallthrough */ }
     }
     if (navigator.share) {
-      try { await navigator.share({ text: payload.text }); return true; } catch { /* cancelled */ }
+      try { await navigator.share(link ? { text, url: link } : { text }); return true; } catch { /* cancelled */ }
+    }
+    if (has('openLink')) {
+      try { get('openLink')(maxShareUrl); return true; } catch { /* fallthrough */ }
     }
     return false;
   },

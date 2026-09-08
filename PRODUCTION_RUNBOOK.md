@@ -44,11 +44,13 @@ HUB_ADMIN_IDS=<MAX user_id через запятую>
 HUB_CORS_ORIGIN=https://games.example.ru
 HUB_WEBAPP_URL=https://games.example.ru
 HUB_BOT_USERNAME=id0000000000_bot
-HUB_MAX_AUTH_AGE_SECONDS=86400
+HUB_MAX_AUTH_AGE_SECONDS=3600
 PORT=8787
 ```
 
-`HUB_HASH_SALT` и `HUB_ADMIN_TOKEN` должны быть разными секретами. Пример генерации:
+`HUB_HASH_SALT` и `HUB_ADMIN_TOKEN` должны быть разными секретами. MAX рекомендует интервал свежести `initData` около одного часа; не расширяйте `HUB_MAX_AUTH_AGE_SECONDS` без отдельной причины и threat review.
+
+Пример генерации secrets:
 
 ```bash
 openssl rand -hex 32
@@ -66,7 +68,7 @@ pg_dump --format=custom --file="hub-before-${RELEASE_SHA}.dump" "$DATABASE_URL"
 psql "$DATABASE_URL" -c 'select 1;'
 ```
 
-Текущая схема создаётся только через `CREATE TABLE/INDEX IF NOT EXISTS`; destructive migrations в проекте сейчас отсутствуют. Это не означает, что будущие релизы можно откатывать без анализа миграций — при появлении ALTER/DROP отдельный migration/rollback plan обязателен.
+Текущая схема обновляется идемпотентными `CREATE ... IF NOT EXISTS` и additive `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`; destructive migrations в проекте сейчас отсутствуют. Будущие `DROP`, rename или изменение типа требуют отдельного migration/rollback plan.
 
 Backup хранить отдельно от application host и проверять, что файл не пустой.
 
@@ -174,11 +176,12 @@ curl -fsS -H "Authorization: Bearer $HUB_ADMIN_TOKEN" https://api.example.ru/sta
 5. Quiz/Sapper daily: одинаковый daily seed в пределах московских суток.
 6. Завершение игры показывает result один раз.
 7. «Ещё раз» действительно создаёт новый корректный run.
-8. Share/deep link открывает нужную игру.
-9. До consent analytics не содержит MAX identity.
-10. Subscribe после consent проходит; повторная подписка не создаёт дубль.
-11. `/forget`/удаление данных проходит только с валидным MAX initData.
-12. Bot `/stats` и `/cast` доступны только admin ids.
+8. Share/deep link открывает внутренний экран шеринга MAX либо корректный MAX deep-link, не уводя штатный fallback во внешний браузер.
+9. Cross-origin `/ev` принимает browser beacon; в Network нет CORS/preflight ошибок analytics.
+10. До consent analytics не содержит MAX identity.
+11. Subscribe после consent проходит; повторная подписка не создаёт дубль.
+12. `/forget`/удаление данных проходит только с валидным MAX initData.
+13. Bot `/stats` и `/cast` доступны только admin ids.
 
 После smoke сравнить server logs: не должно быть циклических `ready/cfg`, массовых `401` на валидном Mini App, 404 внутри `games/`, reconnect loop или uncaught exceptions.
 
@@ -231,7 +234,7 @@ npm ci --omit=dev
 - process restarts/crashes;
 - HTTP 4xx/5xx по endpoint;
 - Postgres connections/errors;
-- объём `open_bot → open_game → finish`;
+- `open_sessions → sessions_with_game → finish` и session-based `start_rate_pct`;
 - долю `share_ok` и `notify_subscribe`;
 - неожиданные всплески `/ev`;
 - 401 `bad init_data`;
