@@ -20,6 +20,8 @@ jobs:
         run: npm ci
       - name: Assets and vendor invariants
         run: npm run check
+      - name: Product and playability contract
+        run: npm run smoke:product
       - name: Iframe bridge contract
         run: npm run smoke:bridge
       - name: Analytics transport and privacy
