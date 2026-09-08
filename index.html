@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#090b14">
 <title>Игротека</title>
 <link rel="stylesheet" href="css/hub.css">
+<link rel="stylesheet" href="css/polish.css">
 <script src="https://st.max.ru/js/max-web-app.js" defer></script>
 <script>
   window.HUB_CONFIG = {
@@ -25,9 +26,11 @@
 <div id="view-menu">
   <header class="hero-head">
     <div class="brand-lockup">
-      <div class="brand-mark" aria-hidden="true">✦</div>
+      <div class="brand-mark" aria-hidden="true">
+        <svg class="brand-glyph"><use href="assets/icons.svg#brand"></use></svg>
+      </div>
       <div>
-        <div class="kicker">MAX MINI ARCADE</div>
+        <div class="kicker">МИНИ-АРКАДА MAX</div>
         <h1>Игротека</h1>
         <p>Короткие игры. Рекорды. Новый вызов каждый день.</p>
       </div>
@@ -36,6 +39,8 @@
   </header>
 
   <section id="daily-card" class="daily-shell" aria-label="Игра дня"></section>
+
+  <section id="progress-strip" class="progress-strip" aria-label="Ваш прогресс"></section>
 
   <div class="section-head">
     <div>
@@ -46,7 +51,6 @@
   </div>
   <div id="games" class="game-grid"></div>
 
-  <section id="progress-strip" class="progress-strip" aria-label="Ваш прогресс"></section>
   <p class="mfoot" id="legal"></p>
 </div>
 
