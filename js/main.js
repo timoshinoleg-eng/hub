@@ -15,7 +15,7 @@ const el=(tag,cls,html)=>{const n=document.createElement(tag);if(cls)n.className
 const state={game:null,score:null,challenge:null,finishMeta:null};
 window.__hubStartParam=bridge.startParam();
 
-function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function art(g,cls='game-art'){return `<img class="${cls}" src="${esc(g.icon||'')}" alt="" aria-hidden="true">`}
 function formatBest(g,best){return best==null?'Рекорда ещё нет':`Рекорд ${best}${g.unit?' '+g.unit:''}`}
 function deepLink(gameId,score){const bot=CFG.bot;if(!bot)return '';const p=score==null?`g${gameId}`:`g${gameId}_s${score}`;return `https://max.ru/${bot}?startapp=${p}`}
@@ -50,12 +50,12 @@ function openGame(id,challenge=null){
   const g=byId(id);if(!g)return;state.game=g;state.score=null;state.challenge=challenge;state.finishMeta=null;lastScoreHaptic=0;
   const pg=getGameProgress(g.id);document.documentElement.style.setProperty('--active-game',g.accent||'#6f63ff');$('#game-title').textContent=g.title;$('#game-meta').textContent=`${g.genre} · ${formatBest(g,pg.best)}`;$('#game-score').textContent='';
   let src=`games/${g.id}/index.html`;if(g.cfg?.daily)src+='?seed='+dailySeed();if(challenge!=null)src+=(src.includes('?')?'&':'?')+'challenge='+challenge;
-  const frame=$('#game-frame');frame.classList.add('loading');frame.src=src;$('#overlay').innerHTML='';document.body.dataset.view='game';track('open_game',g.id);bridge.haptic('selection');offBack();offBack=bridge.onBack(backToMenu);setTimeout(()=>state.game?.id===g.id&&showGameTip(g),500);
+  const frame=$('#game-frame');frame.style.opacity='0';frame.style.transition='opacity .16s ease';frame.src=src;$('#overlay').innerHTML='';document.body.dataset.view='game';track('open_game',g.id);bridge.haptic('selection');offBack();offBack=bridge.onBack(backToMenu);setTimeout(()=>state.game?.id===g.id&&showGameTip(g),500);
 }
 function backToMenu(){offBack();offBack=()=>{};$('#game-frame').src='about:blank';$('#game-score').textContent='';document.body.dataset.view='menu';state.game=null;state.challenge=null;renderMenu();track('back_to_menu')}
 function onMessage(e){
   const d=e.data;if(!d||d.__hub!==1)return;const f=document.getElementById('game-frame');if(!f||e.source!==f.contentWindow)return;
-  if(d.type==='ready'){if(!state.game||d.game!==state.game.id)return;f.contentWindow.postMessage({__hub:1,type:'cfg',game:d.game,cfg:state.game.cfg||{}},'*');requestAnimationFrame(()=>f.classList.remove('loading'));return}
+  if(d.type==='ready'){if(!state.game||d.game!==state.game.id)return;f.contentWindow.postMessage({__hub:1,type:'cfg',game:d.game,cfg:state.game.cfg||{}},'*');requestAnimationFrame(()=>{f.style.opacity='1'});return}
   if(!state.game)return;
   if(d.type==='score'){
     const hadScore=state.score!=null;const changed=String(state.score)!==String(d.value);state.score=d.value;$('#game-score').textContent=d.value;
