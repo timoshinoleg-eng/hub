@@ -1,204 +1,35 @@
-const colors = ["green", "red", "yellow", "blue"];
-let gamePattern = [];
-let userPattern = [];
-let level = 0;
-let clickCount = 0;
-let gameStarted = false;
-
-let __hubDone = false;
-function hubScore(s) { window.parent.postMessage({ __hub: 1, type: "score", value: s }, "*"); }
-function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.postMessage({ __hub: 1, type: "finish", score: s }, "*"); }
-
-document.getElementById("start-btn").addEventListener("click", startGame);
-
-function startGame() {
-  if (!gameStarted) {
-    gameStarted = true;
-    level = 0;
-    gamePattern = [];
-    userPattern = [];
-    clickCount = 0;
-    document.getElementById("status").textContent = `Уровень ${level}`;
-    document.getElementById("click-count").textContent = clickCount;
-
-    showMyTexts();
-    nextSequence();
-  }
+const COLORS=['green','red','yellow','blue'];
+const buttons=COLORS.map((id)=>document.getElementById(id));
+const startBtn=document.getElementById('start-btn');
+const phaseEl=document.getElementById('phase');
+const levelEl=document.getElementById('level');
+const completedEl=document.getElementById('completed');
+const messageEl=document.getElementById('level-message');
+let sequence=[],level=0,completed=0,userIndex=0,accepting=false,run=0,__hubDone=false;
+const sleep=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
+const hubScore=(s)=>window.parent.postMessage({__hub:1,type:'score',value:s},'*');
+function hubFinish(s){if(__hubDone)return;__hubDone=true;window.parent.postMessage({__hub:1,type:'finish',score:s},'*')}
+function setPhase(text){phaseEl.textContent=text}
+function flash(color){const b=document.getElementById(color);b.classList.add('active');setTimeout(()=>b.classList.remove('active'),230)}
+function updateHud(){levelEl.textContent=String(level);completedEl.textContent=String(completed)}
+async function playSequence(id){
+  accepting=false;setPhase('Смотри внимательно…');messageEl.textContent='';messageEl.className='';
+  const gap=Math.max(300,560-level*18);
+  await sleep(220);
+  for(const color of sequence){if(id!==run)return;flash(color);await sleep(gap)}
+  if(id!==run)return;userIndex=0;accepting=true;setPhase('Твоя очередь');
 }
-
-function nextSequence() {
-  userPattern = [];
-  clickCount = 0;
-  document.getElementById("click-count").textContent = clickCount;
-  level++;
-  document.getElementById("status").textContent = `Уровень ${level}`;
-
-  // Clear the sequence display at the start of each level
-  document.getElementById("sequence-display").textContent = "-";
-
-  // Generate a random color and push it to the gamePattern
-  const randomColor = colors[Math.floor(Math.random() * colors.length)];
-  gamePattern.push(randomColor);
-
-  animateSequence();
+function nextLevel(id){if(id!==run)return;level++;sequence.push(COLORS[Math.floor(Math.random()*COLORS.length)]);updateHud();playSequence(id)}
+function startGame(){
+  run++;sequence=[];level=0;completed=0;userIndex=0;accepting=false;__hubDone=false;updateHud();hubScore(0);startBtn.hidden=true;startBtn.textContent='Ещё раз';nextLevel(run);
 }
-
-function animateSequence() {
-  let i = 0;
-  const interval = setInterval(() => {
-    flashButton(gamePattern[i]);
-    i++;
-    if (i === gamePattern.length) {
-      clearInterval(interval);
-      enableUserInput();
-    }
-  }, 600);
+function fail(color){
+  accepting=false;completed=Math.max(0,level-1);updateHud();setPhase('Ошибка — но ритм уже в памяти');messageEl.textContent=`Нужен был цвет: ${color==='green'?'зелёный':color==='red'?'красный':color==='yellow'?'жёлтый':'синий'}`;messageEl.className='lose';flash(color);hubFinish(completed);startBtn.hidden=false;startBtn.textContent='Ещё раз';
 }
-
-function flashButton(color) {
-  const button = document.getElementById(color);
-  button.classList.add("active");
-  setTimeout(() => {
-    button.classList.remove("active");
-  }, 300);
+function press(color){
+  if(!accepting)return;flash(color);const expected=sequence[userIndex];if(color!==expected){fail(expected);return}userIndex++;
+  if(userIndex===sequence.length){accepting=false;completed=level;updateHud();hubScore(completed);setPhase('Точно! Следующий ритм…');messageEl.textContent=`Уровень ${level} пройден ✦`;messageEl.className='';const id=run;setTimeout(()=>nextLevel(id),620)}
 }
-
-function __echoTouch(e) { e.preventDefault(); handleUserClick(e); }
-function enableUserInput() {
-  colors.forEach((color) => {
-    const b = document.getElementById(color);
-    b.addEventListener("click", handleUserClick);
-    b.addEventListener("touchstart", __echoTouch, { passive: false });
-  });
-}
-
-function disableUserInput() {
-  colors.forEach((color) => {
-    const b = document.getElementById(color);
-    b.removeEventListener("click", handleUserClick);
-    b.removeEventListener("touchstart", __echoTouch);
-  });
-}
-
-function handleUserClick(event) {
-  const clickedColor = event.target.id;
-  userPattern.push(clickedColor);
-  flashButton(clickedColor);
-  clickCount++;
-  document.getElementById("click-count").textContent = clickCount;
-
-  // Update the current sequence display and set the text color to the box clicked
-  const sequenceDisplay = document.getElementById("sequence-display");
-  sequenceDisplay.innerHTML = ""; // Clear the previous content
-
-  // Iterate through the userPattern and display each color with its own color
-  userPattern.forEach((color) => {
-    const span = document.createElement("span");
-    span.style.color = color; // Set the color of the span to match the button color
-    span.textContent = color.toUpperCase() + " "; // Convert the color name to uppercase
-    sequenceDisplay.appendChild(span); // Append the span to the display
-  });
-
-  checkAnswer(userPattern.length - 1);
-}
-
-function checkAnswer(currentLevel) {
-  if (userPattern[currentLevel] === gamePattern[currentLevel]) {
-    if (userPattern.length === gamePattern.length) {
-      disableUserInput();
-      setTimeout(() => {
-        // Show the congrats message when the level is passed
-        showCongratsMessage();
-        setTimeout(() => {
-          hideCongratsMessage();
-          setTimeout(() => {}, 1000); // Delay before starting the next level
-          nextSequence();
-        }, 2000); // Hide congrats message after 2 seconds
-      }, 1000);
-    }
-  } else {
-    document.getElementById("status").textContent = `Игра окончена`;
-
-    setTimeout(() => {
-      flashButton(gamePattern[userPattern.length - 1]);
-    }, 1000);
-    setTimeout(() => {
-      hideMyTexts();
-    }, 1000);
-
-    showLoseMessage();
-    hubFinish(level);
-    setTimeout(() => {
-      hideLoseMessage();
-    }, 2000);
-
-    // Disable further input
-    gameStarted = false;
-
-    // Reset the game state after a brief delay
-    setTimeout(() => {
-      level = 0;
-      gamePattern = [];
-      document.getElementById("sequence-display").textContent = "-";
-      document.getElementById("click-count").textContent = 0;
-    }, 1500);
-  }
-}
-
-function showCongratsMessage() {
-  const message = `Поздравляем! Уровень ${level} пройден!`;
-  const congratsMessageElement = document.getElementById("level-message");
-  congratsMessageElement.textContent = message;
-  congratsMessageElement.style.display = "block"; // Ensure it's displayed
-  setTimeout(() => {
-    congratsMessageElement.classList.add("show"); // Show the message with animation
-  }, 50); // Small delay to trigger the animation
-}
-
-function hideCongratsMessage() {
-  const congratsMessageElement = document.getElementById("level-message");
-  congratsMessageElement.classList.remove("show"); // Remove animation class
-  setTimeout(() => {
-    congratsMessageElement.style.display = "none"; // Hide the message after animation
-  }, 1000); // Delay hiding it after the fade-out effect
-}
-
-function showLoseMessage() {
-  const message = `Игра окончена. Нужен был цвет ${
-    gamePattern[userPattern.length - 1]
-  }.`;
-  const loseMessageElement = document.getElementById("level-message");
-  loseMessageElement.textContent = message;
-  // set color to red
-  loseMessageElement.style.color = "red";
-  loseMessageElement.style.display = "block"; // Ensure it's displayed
-  setTimeout(() => {
-    loseMessageElement.classList.add("show"); // Show the message with animation
-  }, 50); // Small delay to trigger the animation
-}
-
-function hideLoseMessage() {
-  const loseMessageElement = document.getElementById("level-message");
-  loseMessageElement.classList.remove("show"); // Remove animation class
-  setTimeout(() => {
-    loseMessageElement.style.display = "none"; // Hide the message after animation
-  }, 1000); // Delay hiding it after the fade-out effect
-}
-
-function showMyTexts() {
-  const texts = document.getElementsByClassName("my-text");
-
-  for (let i = 0; i < texts.length; i++) {
-    texts[i].style.display = "block";
-    texts[i].classList.add("show");
-  }
-}
-
-function hideMyTexts() {
-  const texts = document.getElementsByClassName("my-text");
-
-  for (let i = 0; i < texts.length; i++) {
-    texts[i].classList.remove("show");
-    texts[i].style.display = "none";
-  }
-}
+startBtn.addEventListener('click',startGame);
+buttons.forEach((b)=>b.addEventListener('pointerdown',(e)=>{e.preventDefault();press(b.id)}));
+updateHud();

@@ -1,41 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Talha - Simon Says Game</title>
-    <link rel="stylesheet" href="style.css" />
-    <script src="script.js" defer></script>
-
-    <!-- 👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻-->
-    <!-- Also uploaded the demo of this code in a gif : https://c.tenor.com/x8v1oNUOmg4AAAAd/tenor.gif-->
-    <!-- 👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻-->
-
-    <!-- 👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻👇🏻-->
-    <!-- More html-css-js Games Calculators Games Cards Elements Projects on https://www.github.com/he-is-talha -->
-    <!-- 👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻👆🏻-->
-  </head>
-  <body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Эхо</title>
+<link rel="stylesheet" href="style.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+<main>
+  <header class="ehead">
+    <span>◉ ПАМЯТЬ НА СКОРОСТЬ</span>
     <h1>Эхо</h1>
-    <div id="game-container">
-      <div class="color-btn" id="green"></div>
-      <div class="color-btn" id="red"></div>
-      <div class="color-btn" id="yellow"></div>
-      <div class="color-btn" id="blue"></div>
-    </div>
-    <div id="game-status">
-      <p class="my-text" id="sequence" style="display: none;">
-        Последовательность: <span id="sequence-display">-</span>
-      </p>
-      <p class="my-text" id="clicks" style="display: none;">
-        Нажатий: <span id="click-count">0</span>
-      </p>
-      <p class="my-text" id="status" style="display: none;">
-        Статус: <span id="status">ожидание</span>
-      </p>
-    </div>
-    <button id="start-btn">Начать</button>
-    <p id="level-message" style="display: none;"></p>
-  <script src="../_boot.js" data-game="echo"></script>
+    <p id="phase">Запомни ритм и повтори его.</p>
+  </header>
+  <div class="ehud">
+    <div><small>УРОВЕНЬ</small><strong id="level">0</strong></div>
+    <div><small>ПРОЙДЕНО</small><strong id="completed">0</strong></div>
+  </div>
+  <div id="game-container" class="pads" aria-label="Цветовые кнопки">
+    <button class="color-btn" id="green" aria-label="Зелёный"></button>
+    <button class="color-btn" id="red" aria-label="Красный"></button>
+    <button class="color-btn" id="yellow" aria-label="Жёлтый"></button>
+    <button class="color-btn" id="blue" aria-label="Синий"></button>
+  </div>
+  <div id="level-message" aria-live="polite"></div>
+  <button id="start-btn" type="button">Начать</button>
+</main>
+<script src="../_boot.js" data-game="echo"></script>
 </body>
 </html>

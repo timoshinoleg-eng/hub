@@ -1,26 +1,21 @@
 <!doctype html>
-<html lang="ru" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-    <title>Змейка</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="script.js" defer></script>
-  </head>
-  <body>
-    <main class="wrapper">
-      <div class="game-details">
-        <span class="score">Счёт: 0</span>
-        <span class="high-score">Рекорд: 0</span>
-      </div>
-      <div class="play-board" aria-label="Поле змейки"></div>
-      <div class="controls" aria-label="Управление">
-        <i data-key="ArrowLeft" aria-label="Влево">←</i>
-        <i data-key="ArrowUp" aria-label="Вверх">↑</i>
-        <i data-key="ArrowRight" aria-label="Вправо">→</i>
-        <i data-key="ArrowDown" aria-label="Вниз">↓</i>
-      </div>
-    </main>
-    <script src="../_boot.js" data-game="snake"></script>
-  </body>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Змейка</title>
+<link rel="stylesheet" href="style.css">
+<script src="script.js" defer></script>
+</head>
+<body>
+<main class="wrapper">
+  <header class="shead"><span>🐍 НЕОНОВАЯ АРКАДА</span><h1>Змейка</h1></header>
+  <div class="game-details"><span class="score">Счёт: 0</span><span class="high-score">Рекорд: 0</span></div>
+  <div class="play-board" aria-label="Поле змейки"></div>
+  <div class="controls" aria-label="Управление">
+    <button data-key="ArrowLeft" aria-label="Влево">←</button><button data-key="ArrowUp" aria-label="Вверх">↑</button><button data-key="ArrowRight" aria-label="Вправо">→</button><button data-key="ArrowDown" aria-label="Вниз">↓</button>
+  </div>
+</main>
+<script src="../_boot.js" data-game="snake"></script>
+</body>
 </html>
