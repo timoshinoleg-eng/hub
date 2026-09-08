@@ -265,9 +265,9 @@ export async function stats({ days = 0 } = {}) {
     opens AS (SELECT DISTINCT session_id FROM scoped WHERE action = 'open_bot' AND session_id IS NOT NULL)
     SELECT
       (SELECT count(*)::int FROM opens) AS open_sessions,
-      count(DISTINCT session_id) FILTER (WHERE action = 'open_game' AND session_id IN (SELECT session_id FROM opens))::int AS game_sessions,
-      count(DISTINCT session_id) FILTER (WHERE action = 'first_visit' AND session_id IN (SELECT session_id FROM opens))::int AS first_visit_sessions,
-      count(DISTINCT session_id) FILTER (WHERE action = 'return_visit' AND session_id IN (SELECT session_id FROM opens))::int AS returning_sessions
+      (count(DISTINCT session_id) FILTER (WHERE action = 'open_game' AND session_id IN (SELECT session_id FROM opens)))::int AS game_sessions,
+      (count(DISTINCT session_id) FILTER (WHERE action = 'first_visit' AND session_id IN (SELECT session_id FROM opens)))::int AS first_visit_sessions,
+      (count(DISTINCT session_id) FILTER (WHERE action = 'return_visit' AND session_id IN (SELECT session_id FROM opens)))::int AS returning_sessions
     FROM scoped
   `, params);
   const s = await pg.query(`SELECT count(*)::int AS n FROM hub_subscribers WHERE consent = true`);
