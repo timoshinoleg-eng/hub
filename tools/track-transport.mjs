@@ -1,57 +1,45 @@
 #!/usr/bin/env node
-/** Проверяет, что browser transport отправляет JSON с корректным Content-Type. */
 const storage = new Map();
 let beacon = null;
 let fetched = null;
+Object.defineProperty(globalThis, 'window', { configurable: true, value: {
+  HUB_TRACK_ENDPOINT: 'https://hub.example.test/ev',
+  WebApp: { initData: 'signed-max-init-data' },
+  __hubStartParam: '',
+} });
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+  getItem: (k) => storage.has(k) ? storage.get(k) : null,
+  setItem: (k, v) => storage.set(k, String(v)),
+} });
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
+  sendBeacon(url, body) { beacon = { url, body }; return true; },
+} });
+Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '', protocol: 'https:' } });
+Object.defineProperty(globalThis, 'fetch', { configurable: true, value: async (url, opts) => {
+  fetched = { url, opts };
+  return { ok: true, status: 200 };
+} });
 
-Object.defineProperty(globalThis, 'window', {
-  configurable: true,
-  value: {
-    HUB_TRACK_ENDPOINT: 'https://hub.example.test/ev',
-    __hubUserId: '123',
-    __hubStartParam: '',
-  },
-});
-Object.defineProperty(globalThis, 'localStorage', {
-  configurable: true,
-  value: {
-    getItem: (k) => storage.has(k) ? storage.get(k) : null,
-    setItem: (k, v) => storage.set(k, String(v)),
-  },
-});
-Object.defineProperty(globalThis, 'navigator', {
-  configurable: true,
-  value: {
-    sendBeacon(url, body) { beacon = { url, body }; return true; },
-  },
-});
-Object.defineProperty(globalThis, 'location', {
-  configurable: true,
-  value: { search: '' },
-});
-Object.defineProperty(globalThis, 'fetch', {
-  configurable: true,
-  value: async (url, opts) => { fetched = { url, opts }; return { ok: true }; },
-});
-
-const { track } = await import(`../js/track.js?transport=${Date.now()}`);
-track('open_game', 'merge', 1);
-
+const { track, setConsent, subscribe, dump } = await import(`../js/track.js?transport=${Date.now()}`);
 let fails = 0;
-function ok(cond, msg) {
-  console.log(`${cond ? '✓' : '✗'} ${msg}`);
-  if (!cond) fails++;
-}
+function ok(cond, msg) { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fails++; }
 
-ok(beacon?.url === 'https://hub.example.test/ev', 'sendBeacon отправлен в /ev');
-ok(beacon?.body instanceof Blob, 'sendBeacon получает Blob, а не text/plain строку');
-ok(beacon?.body?.type === 'application/json', 'Blob имеет Content-Type application/json');
-const parsed = beacon?.body ? JSON.parse(await beacon.body.text()) : null;
-ok(parsed?.action === 'open_game' && parsed?.game === 'merge', 'JSON payload не повреждён');
-ok(fetched === null, 'fetch fallback не используется при доступном sendBeacon');
+track('open_game', 'merge', 1);
+let parsed = beacon?.body ? JSON.parse(await beacon.body.text()) : null;
+ok(beacon?.body instanceof Blob && beacon.body.type === 'application/json', 'sendBeacon использует application/json Blob');
+ok(parsed?.action === 'open_game' && !('init_data' in parsed) && !('uid_hash' in parsed), 'до consent wire payload не содержит MAX identity');
+ok(!JSON.stringify(dump()).includes('signed-max-init-data'), 'localStorage не содержит initData');
 
-if (fails) {
-  console.error(`\nПровалено: ${fails}`);
-  process.exit(1);
-}
-console.log('\nTransport аналитики корректен.');
+setConsent();
+track('finish', 'merge', 10);
+parsed = beacon?.body ? JSON.parse(await beacon.body.text()) : null;
+ok(parsed?.init_data === 'signed-max-init-data', 'после consent подписанный initData передаётся для server validation');
+ok(!JSON.stringify(dump()).includes('signed-max-init-data'), 'даже после consent initData не сохраняется локально');
+
+await subscribe('merge');
+const subBody = fetched ? JSON.parse(fetched.opts.body) : null;
+ok(fetched?.url === 'https://hub.example.test/sub', 'subscribe идёт в /sub');
+ok(subBody?.init_data === 'signed-max-init-data' && !('user_id' in subBody), 'subscribe не принимает self-asserted user_id');
+
+if (fails) { console.error(`\nПровалено: ${fails}`); process.exit(1); }
+console.log('\nPrivacy/transport contract аналитики корректен.');

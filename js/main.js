@@ -2,12 +2,12 @@ import { bridge } from './bridge.js';
 import { track, hasConsent, setConsent, subscribe } from './track.js';
 import { cardDataUrl, shareText } from './share.js';
 import { duelResult } from './duel.js';
+import { dailySeed } from './daily.js';
 import { GAMES, byId, visible } from './games.js';
 
 const CFG = window.HUB_CONFIG || {};
 const SHOW_ALL = new URLSearchParams(location.search).has('all');
 const HUB_NAME = CFG.hubName || 'Игротека';
-
 const $ = (s) => document.querySelector(s);
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -16,19 +16,9 @@ const el = (tag, cls, html) => {
   return n;
 };
 
-const state = {
-  game: null,
-  score: null,
-  view: 'menu',
-  challenge: null,
-};
-
-/* ── Идентификация и deep link ─────────────────────────────────────────── */
-
-window.__hubUserId = bridge.userId();
+const state = { game: null, score: null, view: 'menu', challenge: null };
 window.__hubStartParam = bridge.startParam();
 
-/** https://max.ru/<bot>?startapp=g<id>_s<score> — допускаются только A-Z a-z 0-9 _ - */
 function deepLink(gameId, score) {
   const bot = CFG.bot;
   if (!bot) return '';
@@ -44,26 +34,17 @@ function parseStartParam(sp) {
   return { game, challenge: m[2] ? Number(m[2]) : null };
 }
 
-/** «Пазл дня»: YYYY-MM-DD в локальном часовом поясе. Один и тот же у всех за сутки. */
-function dailySeed() {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
-/* ── Меню ──────────────────────────────────────────────────────────────── */
-
 function renderMenu() {
   const list = $('#games');
   list.innerHTML = '';
   for (const g of visible(SHOW_ALL)) {
     const card = el('button', 'gcard' + (g.enabled ? '' : ' draft'));
     card.dataset.id = g.id;
+    const badge = !g.enabled ? '<span class="gd">в работе</span>' : (g.cfg?.daily ? '<span class="gd">пазл дня</span>' : '');
     card.innerHTML = `
       <span class="ge">${g.emoji}</span>
       <span class="gt"><b>${g.title}</b><i>${g.tagline}</i></span>
-      ${g.enabled ? '' : '<span class="gd">в работе</span>'}
+      ${badge}
       <span class="ga">›</span>`;
     card.addEventListener('click', () => openGame(g.id));
     list.appendChild(card);
@@ -71,18 +52,16 @@ function renderMenu() {
   $('#count').textContent = `${visible(SHOW_ALL).length} из ${GAMES.length}`;
 }
 
-/* ── Игра в iframe ─────────────────────────────────────────────────────── */
-
 let offBack = () => {};
-
 function openGame(id, challenge = null) {
   const g = byId(id);
   if (!g) return;
   state.game = g;
   state.score = null;
   state.challenge = challenge;
-
   $('#game-title').textContent = g.title;
+  $('#game-score').textContent = '';
+
   let src = `games/${g.id}/index.html`;
   if (g.cfg?.daily) src += '?seed=' + dailySeed();
   if (challenge != null) src += (src.includes('?') ? '&' : '?') + 'challenge=' + challenge;
@@ -92,6 +71,7 @@ function openGame(id, challenge = null) {
 
   track('open_game', g.id);
   bridge.haptic('selection');
+  offBack();
   offBack = bridge.onBack(backToMenu);
 }
 
@@ -99,12 +79,13 @@ function backToMenu() {
   offBack();
   offBack = () => {};
   $('#game-frame').src = 'about:blank';
+  $('#game-score').textContent = '';
   document.body.dataset.view = 'menu';
   state.game = null;
+  state.challenge = null;
   track('back_to_menu');
 }
 
-/** Ответ на ready игры — передаём её конфиг. */
 function onMessage(e) {
   const d = e.data;
   if (!d || d.__hub !== 1) return;
@@ -112,9 +93,11 @@ function onMessage(e) {
   if (!f || e.source !== f.contentWindow) return;
 
   if (d.type === 'ready') {
-    f.contentWindow.postMessage({ __hub: 1, type: 'cfg', game: d.game, cfg: state.game?.cfg || {} }, '*');
+    if (!state.game || d.game !== state.game.id) return;
+    f.contentWindow.postMessage({ __hub: 1, type: 'cfg', game: d.game, cfg: state.game.cfg || {} }, '*');
     return;
   }
+  if (!state.game) return;
   if (d.type === 'score') {
     state.score = d.value;
     $('#game-score').textContent = d.value;
@@ -122,20 +105,17 @@ function onMessage(e) {
   }
   if (d.type === 'finish') {
     state.score = d.score ?? state.score;
-    track('finish', state.game?.id, state.score);
+    track('finish', state.game.id, state.score);
     showResult();
-    return;
   }
 }
 
-/* ── Результат: шаринг и «уведомить о запуске» ─────────────────────────── */
-
 function showResult() {
   const g = state.game;
+  if (!g) return;
   const score = state.score ?? 0;
   const link = deepLink(g.id, score);
   const duel = duelResult(score, state.challenge, g.cfg?.higherIsBetter !== false);
-
   const box = el('div', 'result');
   const duelLine = duel
     ? `<div class="rduel ${duel.won ? 'win' : 'lose'}">${duel.won
@@ -157,10 +137,7 @@ function showResult() {
       <div class="rhint" id="r-hint"></div>
     </div>`;
 
-  box.querySelector('.rimg').src = cardDataUrl({
-    title: g.title, emoji: g.emoji, score, unit: g.unit, hubName: HUB_NAME,
-  });
-
+  box.querySelector('.rimg').src = cardDataUrl({ title: g.title, emoji: g.emoji, score, unit: g.unit, hubName: HUB_NAME });
   box.querySelector('#r-share').onclick = async () => {
     const ok = await bridge.share(shareText({ title: g.title, score, unit: g.unit, link }), link);
     track(ok ? 'share_ok' : 'share_fallback', g.id, score);
@@ -169,13 +146,11 @@ function showResult() {
       box.querySelector('.rimg').style.display = 'block';
     }
   };
-
   box.querySelector('#r-again').onclick = () => {
     track('replay', g.id, score);
     box.remove();
-    openGame(g.id);
+    openGame(g.id, state.challenge);
   };
-
   box.querySelector('#r-notify').onclick = async (ev) => {
     const btn = ev.target;
     if (!hasConsent()) { showConsent(() => doSubscribe(btn, g, score)); return; }
@@ -187,13 +162,6 @@ function showResult() {
   bridge.haptic('notify');
 }
 
-/* ── Согласие на обработку персональных данных ─────────────────────────── */
-
-/**
- * Юрлицо обязано получить согласие до того, как начнёт собирать
- * идентификатор пользователя. Без согласия аналитика работает
- * анонимно, а кнопка «уведомить о запуске» не отправляет user_id.
- */
 async function doSubscribe(btn, g, score) {
   const r = await subscribe(g.id);
   track(r.ok ? 'notify_subscribe' : 'notify_failed', g.id, score);
@@ -208,34 +176,28 @@ function showConsent(onAccept) {
     <div class="rcard">
       <div class="rttl">Нужно согласие</div>
       <p class="mut" style="margin:0 0 14px;font-size:13.5px">
-        Чтобы написать вам о запуске, мы сохраним ваш идентификатор в MAX.
-        Больше ничего. <a href="${CFG.policyUrl || '#'}" target="_blank" rel="noopener">Политика обработки данных</a>
+        Чтобы написать вам о запуске, сервер проверит подписанные данные MAX и сохранит только ваш идентификатор пользователя.
+        <a href="${CFG.policyUrl || '#'}" target="_blank" rel="noopener">Политика обработки данных</a>
       </p>
       <div class="rrow">
         <button class="btn primary" id="c-yes">Согласен</button>
         <button class="btn" id="c-no">Не надо</button>
       </div>
     </div>`;
-  box.querySelector('#c-yes').onclick = () => { setConsent(); track('consent_yes'); box.remove(); onAccept && onAccept(); };
+  box.querySelector('#c-yes').onclick = () => { setConsent(); track('consent_yes'); box.remove(); onAccept?.(); };
   box.querySelector('#c-no').onclick = () => { track('consent_no'); box.remove(); };
   $('#overlay').appendChild(box);
 }
-
-/* ── Старт ─────────────────────────────────────────────────────────────── */
 
 function init() {
   bridge.ready();
   bridge.expand();
   renderMenu();
   window.addEventListener('message', onMessage);
-
   $('#back').addEventListener('click', backToMenu);
-  $('#reload').addEventListener('click', () => openGame(state.game.id));
-
+  $('#reload').addEventListener('click', () => state.game && openGame(state.game.id, state.challenge));
   track('open_bot');
 
-  // Юрлицо обязано дать доступ к политике и оферте из продукта,
-  // а не только из карточки бота.
   const parts = ['Мини-игры в MAX · без рекламы и покупок'];
   if (CFG.orgName) parts.push(CFG.orgName);
   const links = [];
@@ -257,10 +219,7 @@ function init() {
       setTimeout(() => n.remove(), 4000);
     }
   }
-
-  if (!CFG.bot) {
-    console.warn('[hub] HUB_CONFIG.bot не задан — deep link в шаринге работать не будет');
-  }
+  if (!CFG.bot) console.warn('[hub] HUB_CONFIG.bot не задан — deep link в шаринге работать не будет');
 }
 
 document.addEventListener('DOMContentLoaded', init);
