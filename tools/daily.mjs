@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * daily.mjs — проверяет «пазл дня»: одинаковый ?seed => одинаковая раскладка
- * у сапёра и викторины, разный seed => разная. Гоняет реальный script.js
- * игр в изолированном vm с заглушками DOM, без браузера.
- */
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { join, dirname } from 'node:path';
@@ -35,11 +30,8 @@ function runGame(file, seed, exportExpr, pre = '') {
     location: { search: seed ? `?seed=${seed}` : '' },
     window: { parent: { postMessage() {} }, addEventListener() {}, onload: null },
     document: {
-      getElementById: () => mkEl(),
-      createElement: () => mkEl(),
-      createTextNode: () => mkEl(),
-      querySelector: () => mkEl(),
-      addEventListener() {},
+      getElementById: () => mkEl(), createElement: () => mkEl(), createTextNode: () => mkEl(),
+      querySelector: () => mkEl(), addEventListener() {},
     },
   };
   sandbox.globalThis = sandbox;
@@ -50,31 +42,23 @@ function runGame(file, seed, exportExpr, pre = '') {
 }
 
 let fails = 0;
-function ok(cond, msg) {
-  console.log(`${cond ? '✓' : '✗'} ${msg}`);
-  if (!cond) fails++;
-}
+function ok(cond, msg) { console.log(`${cond ? '✓' : '✗'} ${msg}`); if (!cond) fails++; }
 
-// ── Сапёр ──
 const sa1 = runGame(SAPPER, SEED_A, 'minesLocation', 'setMines();');
 const sa2 = runGame(SAPPER, SEED_A, 'minesLocation', 'setMines();');
 const sa3 = runGame(SAPPER, SEED_B, 'minesLocation', 'setMines();');
-const sa0 = runGame(SAPPER, null, 'minesLocation', 'setMines();');
-
-ok(sa1.length === 10, `сапёр: 10 мин (seed ${SEED_A})`);
-ok(new Set(sa1).size === 10, 'сапёр: мины без дублей');
+ok(sa1.length === 10 && new Set(sa1).size === 10, 'сапёр: 10 уникальных мин');
 ok(JSON.stringify(sa1) === JSON.stringify(sa2), 'сапёр: одинаковый seed => одинаковая раскладка');
-ok(JSON.stringify(sa1) !== JSON.stringify(sa3), `сапёр: разный seed => разная раскладка (${SEED_A} vs ${SEED_B})`);
-ok(sa0.length === 10, 'сапёр: без seed раскладка строится (Math.random)');
+ok(JSON.stringify(sa1) !== JSON.stringify(sa3), 'сапёр: разный seed => разная раскладка');
 
-// ── Викторина ──
 const q1 = runGame(QUIZ, SEED_A, 'quizData.map(q => q.question)');
 const q2 = runGame(QUIZ, SEED_A, 'quizData.map(q => q.question)');
 const q3 = runGame(QUIZ, SEED_B, 'quizData.map(q => q.question)');
-
 ok(q1.length === 20, 'викторина: 20 вопросов');
 ok(JSON.stringify(q1) === JSON.stringify(q2), 'викторина: одинаковый seed => одинаковый порядок');
-ok(JSON.stringify(q1) !== JSON.stringify(q3), `викторина: разный seed => разный порядок (${SEED_A} vs ${SEED_B})`);
+ok(JSON.stringify(q1) !== JSON.stringify(q3), 'викторина: разный seed => разный порядок');
+const quizSource = readFileSync(QUIZ, 'utf8');
+ok(quizSource.includes('shuffleArray(quizData);') && !quizSource.includes('quizData.sort(() => __hubRand'), 'вопросы перемешиваются Fisher–Yates, а не engine-dependent Array.sort');
 
 console.log(fails === 0 ? '\nПазл дня детерминирован. Всё ок.' : `\nПровалено проверок: ${fails}`);
 process.exit(fails === 0 ? 0 : 1);

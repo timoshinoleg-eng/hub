@@ -34,8 +34,6 @@ let currentQuestion = 0;
 let score = 0;
 let incorrectAnswers = [];
 
-
-// «Пазл дня»: при ?seed=YYYY-MM-DD раскладка детерминирована для всех за этот день.
 const __hubParams = new URLSearchParams(location.search);
 const __hubSeed = __hubParams.get("seed");
 function __hubHash(s) { let h = 1779033703 ^ s.length; for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); } return (h >>> 0); }
@@ -57,30 +55,24 @@ function shuffleArray(array) {
 
 function displayQuestion() {
   const questionData = quizData[currentQuestion];
-
   const questionElement = document.createElement("div");
   questionElement.className = "question";
-  questionElement.innerHTML = `${currentQuestion + 1}.${questionData.question}`;
+  questionElement.textContent = `${currentQuestion + 1}. ${questionData.question}`;
 
   const optionsElement = document.createElement("div");
   optionsElement.className = "options";
-
   const shuffledOptions = [...questionData.options];
   shuffleArray(shuffledOptions);
 
-  for (let i = 0; i < shuffledOptions.length; i++) {
+  for (const value of shuffledOptions) {
     const option = document.createElement("label");
     option.className = "option";
-
     const radio = document.createElement("input");
     radio.type = "radio";
     radio.name = "quiz";
-    radio.value = shuffledOptions[i];
-
-    const optionText = document.createTextNode(shuffledOptions[i]);
-
+    radio.value = value;
     option.appendChild(radio);
-    option.appendChild(optionText);
+    option.appendChild(document.createTextNode(value));
     optionsElement.appendChild(option);
   }
 
@@ -91,25 +83,13 @@ function displayQuestion() {
 
 function checkAnswer() {
   const selectedOption = document.querySelector('input[name="quiz"]:checked');
-  if (selectedOption) {
-    const answer = selectedOption.value;
-    if (answer === quizData[currentQuestion].answer) {
-      score++;
-    } else {
-      incorrectAnswers.push({
-        question: quizData[currentQuestion].question,
-        incorrectAnswer: answer,
-        correctAnswer: quizData[currentQuestion].answer,
-      });
-    }
-    currentQuestion++;
-    selectedOption.checked = false;
-    if (currentQuestion < quizData.length) {
-      displayQuestion();
-    } else {
-      displayResult();
-    }
-  }
+  if (!selectedOption) return;
+  const answer = selectedOption.value;
+  if (answer === quizData[currentQuestion].answer) score++;
+  else incorrectAnswers.push({ question: quizData[currentQuestion].question, incorrectAnswer: answer, correctAnswer: quizData[currentQuestion].answer });
+  currentQuestion++;
+  if (currentQuestion < quizData.length) displayQuestion();
+  else displayResult();
 }
 
 function displayResult() {
@@ -117,7 +97,7 @@ function displayResult() {
   submitButton.style.display = "none";
   retryButton.style.display = "inline-block";
   showAnswerButton.style.display = "inline-block";
-  resultContainer.innerHTML = `Ваш результат: ${score} из ${quizData.length}`;
+  resultContainer.textContent = `Ваш результат: ${score} из ${quizData.length}`;
   hubScore(score);
   hubFinish(score);
 }
@@ -126,11 +106,13 @@ function retryQuiz() {
   currentQuestion = 0;
   score = 0;
   incorrectAnswers = [];
+  __hubDone = false;
   quizContainer.style.display = "block";
   submitButton.style.display = "inline-block";
   retryButton.style.display = "none";
   showAnswerButton.style.display = "none";
-  resultContainer.innerHTML = "";
+  resultContainer.textContent = "";
+  shuffleArray(quizData);
   displayQuestion();
 }
 
@@ -139,28 +121,20 @@ function showAnswer() {
   submitButton.style.display = "none";
   retryButton.style.display = "inline-block";
   showAnswerButton.style.display = "none";
-
-  let incorrectAnswersHtml = "";
-  for (let i = 0; i < incorrectAnswers.length; i++) {
-    incorrectAnswersHtml += `
-        <p>
-          <strong>Question:</strong> ${incorrectAnswers[i].question}<br>
-          <strong>Your Answer:</strong> ${incorrectAnswers[i].incorrectAnswer}<br>
-          <strong>Correct Answer:</strong> ${incorrectAnswers[i].correctAnswer}
-        </p>
-      `;
+  resultContainer.innerHTML = `<p>Ваш результат: ${score} из ${quizData.length}.</p>`;
+  const title = document.createElement('p');
+  title.textContent = 'Ошибки:';
+  resultContainer.appendChild(title);
+  for (const item of incorrectAnswers) {
+    const p = document.createElement('p');
+    p.textContent = `${item.question} Ваш ответ: ${item.incorrectAnswer}. Правильный: ${item.correctAnswer}.`;
+    resultContainer.appendChild(p);
   }
-
-  resultContainer.innerHTML = `
-      <p>Ваш результат: ${score} из ${quizData.length}.</p>
-      <p>Incorrect Answers:</p>
-      ${incorrectAnswersHtml}
-    `;
 }
 
 submitButton.addEventListener("click", checkAnswer);
 retryButton.addEventListener("click", retryQuiz);
 showAnswerButton.addEventListener("click", showAnswer);
 
-quizData.sort(() => __hubRand() - 0.5);
+shuffleArray(quizData);
 displayQuestion();
