@@ -19,5 +19,25 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm run smoke
+      - name: Install dependencies
+        run: npm ci
+      - name: Assets and vendor invariants
+        run: npm run check
+      - name: Iframe bridge contract
+        run: npm run smoke:bridge
+      - name: Analytics transport and privacy
+        run: npm run smoke:track
+      - name: MAX initData authentication
+        run: npm run smoke:auth
+      - name: Merge mechanics
+        run: npm run smoke:merge
+      - name: Daily timezone boundary
+        run: npm run smoke:daily-seed
+      - name: Server contracts
+        run: npm run smoke:server
+      - name: Bot contracts
+        run: npm run smoke:bot
+      - name: Daily determinism
+        run: npm run smoke:daily
+      - name: Duel logic
+        run: npm run smoke:duel
