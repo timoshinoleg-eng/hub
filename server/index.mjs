@@ -92,7 +92,9 @@ export async function buildServer({ logger = true } = {}) {
 
   app.get('/stats', async (req, reply) => {
     if (!isAdmin(req)) return reply.code(401).send({ error: 'unauthorized' });
-    return db.stats();
+    const rawDays = Number(req.query?.days || 0);
+    const days = Number.isInteger(rawDays) && rawDays >= 1 && rawDays <= 90 ? rawDays : 0;
+    return db.stats({ days });
   });
   app.get('/health', async () => db.ping());
   app.get('/export.csv', async (req, reply) => {
