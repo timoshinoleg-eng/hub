@@ -123,35 +123,141 @@ export async function forgetUser(rawUserId) {
 const KEY_ACTIONS = [
   'bot_start',
   'open_bot',
+  'first_visit',
+  'return_visit',
   'open_game',
   'finish',
+  'replay',
   'share_ok',
+  'new_record',
+  'daily_complete',
   'notify_subscribe',
   'bot_pick_game',
 ];
 
-export async function stats() {
+const pct = (n, d) => d > 0 ? Math.round((Number(n || 0) / Number(d)) * 1000) / 10 : 0;
+
+function buildFunnel(counts, nextDayReturns = 0) {
+  const opens = Number(counts.open_bot || 0);
+  const starts = Number(counts.open_game || 0);
+  const finishes = Number(counts.finish || 0);
+  const replays = Number(counts.replay || 0);
+  const shares = Number(counts.share_ok || 0);
+  const returns = Number(counts.return_visit || 0);
+  const daily = Number(counts.daily_complete || 0);
+  return {
+    open_sessions: opens,
+    first_visit_sessions: Number(counts.first_visit || 0),
+    returning_sessions: returns,
+    next_day_return_events: Number(nextDayReturns || 0),
+    game_starts: starts,
+    finishes,
+    replays,
+    shares,
+    daily_completions: daily,
+    start_rate_pct: pct(starts, opens),
+    completion_rate_pct: pct(finishes, starts),
+    finish_per_open_pct: pct(finishes, opens),
+    replay_rate_pct: pct(replays, finishes),
+    share_rate_pct: pct(shares, finishes),
+    returning_session_share_pct: pct(returns, opens),
+    daily_completion_share_pct: pct(daily, opens),
+  };
+}
+
+function emptyGameFunnel() {
+  return { starts: 0, finishes: 0, replays: 0, shares: 0, completion_rate_pct: 0, replay_rate_pct: 0, share_rate_pct: 0 };
+}
+
+function finalizeGameFunnel(out) {
+  for (const v of Object.values(out)) {
+    v.completion_rate_pct = pct(v.finishes, v.starts);
+    v.replay_rate_pct = pct(v.replays, v.finishes);
+    v.share_rate_pct = pct(v.shares, v.finishes);
+  }
+  return out;
+}
+
+function gameFunnelFromEvents(events) {
+  const out = {};
+  for (const e of events) {
+    if (!e.game || !['open_game', 'finish', 'replay', 'share_ok'].includes(e.action)) continue;
+    const v = out[e.game] ||= emptyGameFunnel();
+    if (e.action === 'open_game') v.starts++;
+    else if (e.action === 'finish') v.finishes++;
+    else if (e.action === 'replay') v.replays++;
+    else if (e.action === 'share_ok') v.shares++;
+  }
+  return finalizeGameFunnel(out);
+}
+
+function gameFunnelFromRows(rows) {
+  const out = {};
+  for (const row of rows) {
+    const v = out[row.game] ||= emptyGameFunnel();
+    const n = Number(row.n || 0);
+    if (row.action === 'open_game') v.starts = n;
+    else if (row.action === 'finish') v.finishes = n;
+    else if (row.action === 'replay') v.replays = n;
+    else if (row.action === 'share_ok') v.shares = n;
+  }
+  return finalizeGameFunnel(out);
+}
+
+function normalizedDays(days) {
+  const n = Number(days);
+  return Number.isInteger(n) && n >= 1 && n <= 90 ? n : 0;
+}
+
+export async function stats({ days = 0 } = {}) {
+  days = normalizedDays(days);
+
   if (driver === 'json') {
+    const cutoff = days ? Date.now() - days * 86400000 : 0;
+    const events = cutoff
+      ? jsonDb.events.filter((e) => Number.isFinite(Date.parse(e.ts)) && Date.parse(e.ts) >= cutoff)
+      : jsonDb.events;
     const counts = {};
     const games = {};
-    for (const e of jsonDb.events) {
+    let nextDayReturns = 0;
+    for (const e of events) {
       counts[e.action] = (counts[e.action] || 0) + 1;
       if (e.game) games[e.game] = (games[e.game] || 0) + 1;
+      if (e.action === 'return_visit' && Number(e.value) === 1) nextDayReturns++;
     }
     for (const a of KEY_ACTIONS) if (counts[a] === undefined) counts[a] = 0;
     counts.subscribers = jsonDb.subscribers.filter((s) => s.consent).length;
     counts.games = games;
+    counts.window_days = days;
+    counts.funnel = buildFunnel(counts, nextDayReturns);
+    counts.game_funnel = gameFunnelFromEvents(events);
     return counts;
   }
-  const r = await pg.query(`SELECT action, count(*)::int AS n FROM hub_events GROUP BY action`);
+
+  const where = days ? `ts >= now() - ($1::int * interval '1 day')` : 'TRUE';
+  const params = days ? [days] : [];
+  const r = await pg.query(`SELECT action, count(*)::int AS n FROM hub_events WHERE ${where} GROUP BY action`, params);
   const g = await pg.query(`
-    SELECT game, count(*)::int AS n FROM hub_events WHERE game IS NOT NULL GROUP BY game ORDER BY n DESC
-  `);
+    SELECT game, count(*)::int AS n FROM hub_events
+    WHERE ${where} AND game IS NOT NULL GROUP BY game ORDER BY n DESC
+  `, params);
+  const gf = await pg.query(`
+    SELECT game, action, count(*)::int AS n FROM hub_events
+    WHERE ${where} AND game IS NOT NULL AND action IN ('open_game','finish','replay','share_ok')
+    GROUP BY game, action
+  `, params);
+  const nd = await pg.query(`
+    SELECT count(*)::int AS n FROM hub_events
+    WHERE ${where} AND action = 'return_visit' AND value = 1
+  `, params);
   const s = await pg.query(`SELECT count(*)::int AS n FROM hub_subscribers WHERE consent = true`);
-  const out = { subscribers: s.rows[0].n, games: {} };
+
+  const out = { subscribers: s.rows[0].n, games: {}, window_days: days };
   for (const a of KEY_ACTIONS) out[a] = 0;
   for (const row of r.rows) out[row.action] = row.n;
   for (const row of g.rows) out.games[row.game] = row.n;
+  out.funnel = buildFunnel(out, nd.rows[0]?.n || 0);
+  out.game_funnel = gameFunnelFromRows(gf.rows);
   return out;
 }
 
