@@ -1,37 +1,57 @@
 #!/usr/bin/env node
-/**
- * Сервер событий. Fastify + Postgres (или JSON-файл при отсутствии DATABASE_URL).
- *
- * Эндпоинты:
- *   POST /ev     — событие от хаба
- *   POST /sub    — подписка на «уведомить о запуске»
- *   POST /forget — удаление данных пользователя (152-ФЗ)
- *   GET  /stats  — метрики софт-лонча
- *   GET  /export.csv
- *   GET  /health
- *
- * Запуск:  node server/index.mjs
- * Переменные: PORT, DATABASE_URL, HUB_HASH_SALT, HUB_CORS_ORIGIN
- */
+/** Сервер событий: анонимная аналитика + authenticated MAX subscriptions. */
 import Fastify from 'fastify';
+import { timingSafeEqual } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as db from './db.mjs';
+import { verifyMaxInitData } from './max-auth.mjs';
 
-/**
- * Собирает приложение, но не слушает порт. Запуск — в конце файла, только при
- * прямом вызове. Так server/smoke.mjs гоняет запросы через app.inject()
- * без порта и без сети.
- */
+function safeEqual(a, b) {
+  const aa = Buffer.from(String(a || ''));
+  const bb = Buffer.from(String(b || ''));
+  return aa.length === bb.length && aa.length > 0 && timingSafeEqual(aa, bb);
+}
+
+function assertProductionConfig() {
+  if (process.env.NODE_ENV !== 'production') return;
+  const problems = [];
+  if (db.driver !== 'pg') problems.push('DATABASE_URL/Postgres обязателен в production');
+  if (!process.env.BOT_TOKEN) problems.push('BOT_TOKEN обязателен для MAX initData validation');
+  if ((process.env.HUB_ADMIN_TOKEN || '').length < 32) problems.push('HUB_ADMIN_TOKEN должен быть >=32 символов');
+  if (!/^https:\/\//i.test(process.env.HUB_CORS_ORIGIN || '')) problems.push('HUB_CORS_ORIGIN должен быть https:// origin');
+  if (problems.length) throw new Error(`Unsafe production config: ${problems.join('; ')}`);
+}
+
+function bodyObject(raw) {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch { /* invalid payload handled by route validation */ }
+  }
+  return {};
+}
+
 export async function buildServer({ logger = true } = {}) {
   await db.init();
-  const app = Fastify(
-    logger ? { logger: { transport: { target: 'pino-pretty', options: { translateTime: true } } } } : {}
-  );
+  const opts = { bodyLimit: 32 * 1024 };
+  if (logger) {
+    opts.logger = process.env.NODE_ENV === 'production'
+      ? true
+      : { transport: { target: 'pino-pretty', options: { translateTime: true } } };
+  }
+  const app = Fastify(opts);
+  const corsOrigin = process.env.HUB_CORS_ORIGIN || '';
 
   app.addHook('onRequest', async (req, reply) => {
-    reply.header('Access-Control-Allow-Origin', process.env.HUB_CORS_ORIGIN || '*');
-    reply.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (corsOrigin && req.headers.origin === corsOrigin) {
+      reply.header('Access-Control-Allow-Origin', corsOrigin);
+      reply.header('Access-Control-Allow-Credentials', 'true');
+      reply.header('Vary', 'Origin');
+    }
+    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     reply.header('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
     if (req.method === 'OPTIONS') return reply.code(204).send();
   });
@@ -39,19 +59,26 @@ export async function buildServer({ logger = true } = {}) {
   const clamp = (s, n) => String(s ?? '').slice(0, n);
   const isAction = (s) => /^[a-z_]{2,32}$/.test(String(s || ''));
   const isGame = (s) => /^[a-z]{2,16}$/.test(String(s || ''));
+  const isSession = (s) => /^s_[A-Za-z0-9_-]{8,61}$/.test(String(s || ''));
+  const verifyBody = (b) => verifyMaxInitData(typeof b?.init_data === 'string' ? b.init_data : '');
+  const isAdmin = (req) => {
+    const expected = process.env.HUB_ADMIN_TOKEN || '';
+    const got = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    return safeEqual(got, expected);
+  };
 
   app.post('/ev', async (req, reply) => {
-    const b = req.body || {};
+    const b = bodyObject(req.body);
     if (!isAction(b.action)) return reply.code(400).send({ error: 'bad action' });
-
-    // Сырой user_id из мини-приложения сюда не попадает вообще: хаб шлёт
-    // уже хешированный идентификатор. Если пришло что-то длинное — хешируем.
-    const uid_hash = /^[a-f0-9]{32}$/.test(b.uid_hash || '')
-      ? b.uid_hash
-      : db.hashUid(b.uid_hash || db.anonId());
-
+    let uid_hash = db.anonId();
+    if (typeof b.init_data === 'string' && b.init_data) {
+      const auth = verifyBody(b);
+      if (!auth.ok) return reply.code(401).send({ error: 'bad init_data', reason: auth.reason });
+      uid_hash = db.hashUid(auth.user.id);
+    }
     await db.insertEvent({
       uid_hash,
+      session_id: isSession(b.sid) ? b.sid : null,
       game: isGame(b.game) ? b.game : null,
       action: b.action,
       value: Number.isFinite(Number(b.value)) ? Number(b.value) : null,
@@ -61,51 +88,48 @@ export async function buildServer({ logger = true } = {}) {
   });
 
   app.post('/sub', async (req, reply) => {
-    const b = req.body || {};
-    const user_id = Number(b.user_id);
-    if (!Number.isFinite(user_id)) return reply.code(400).send({ error: 'bad user_id' });
-    if (b.consent === false) return reply.code(200).send({ ok: true, subscribed: false });
-
-    const added = await db.addSubscriber({
-      user_id,
-      uid_hash: db.hashUid(user_id),
-      game: isGame(b.game) ? b.game : null,
-      chat_id: Number.isFinite(Number(b.chat_id)) ? Number(b.chat_id) : null,
-    });
+    const b = bodyObject(req.body);
+    if (b.consent !== true) return reply.code(400).send({ error: 'consent_required' });
+    const auth = verifyBody(b);
+    if (!auth.ok) return reply.code(401).send({ error: 'bad init_data', reason: auth.reason });
+    const user_id = auth.user.id;
+    const added = await db.addSubscriber({ user_id, uid_hash: db.hashUid(user_id), game: isGame(b.game) ? b.game : null, chat_id: null });
     return { ok: true, subscribed: added };
   });
 
   app.post('/forget', async (req, reply) => {
-    const user_id = Number((req.body || {}).user_id);
-    if (!Number.isFinite(user_id)) return reply.code(400).send({ error: 'bad user_id' });
-    await db.forgetUser(user_id);
+    const b = bodyObject(req.body);
+    const auth = verifyBody(b);
+    if (!auth.ok) return reply.code(401).send({ error: 'bad init_data', reason: auth.reason });
+    await db.forgetUser(auth.user.id);
     return { ok: true };
   });
 
-  app.get('/stats', async () => db.stats());
+  app.get('/stats', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(401).send({ error: 'unauthorized' });
+    const rawDays = Number(req.query?.days || 0);
+    const days = Number.isInteger(rawDays) && rawDays >= 1 && rawDays <= 90 ? rawDays : 0;
+    return db.stats({ days });
+  });
   app.get('/health', async () => db.ping());
-
   app.get('/export.csv', async (req, reply) => {
+    if (!isAdmin(req)) return reply.code(401).send({ error: 'unauthorized' });
     reply.header('Content-Type', 'text/csv; charset=utf-8');
     return db.exportCsv();
   });
-
   return app;
 }
 
-/* ── Запуск ────────────────────────────────────────────────────────────── */
-
-// Сравнение с учётом регистра буквы диска и относительных путей в argv[1].
 const isDirectRun = !!process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
-
 if (isDirectRun) {
-  const PORT = Number(process.env.PORT || 8787);
-  const app = await buildServer();
   try {
+    assertProductionConfig();
+    const PORT = Number(process.env.PORT || 8787);
+    const app = await buildServer();
     await app.listen({ port: PORT, host: '0.0.0.0' });
-    console.log(`Сервер событий: http://127.0.0.1:${PORT} · хранилище: ${db.driver}`);
+    console.log(`Сервер событий запущен на порту ${PORT} · хранилище: ${db.driver}`);
   } catch (e) {
-    app.log.error(e);
+    console.error(e?.message || e);
     process.exit(1);
   }
 }

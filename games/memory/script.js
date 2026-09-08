@@ -1,72 +1,28 @@
-const EMOJI = ["🍎", "🍇", "🍓", "🍒", "🍑", "🥝", "🍍", "🍌"];
-const cards = document.querySelectorAll(".card");
-
-let matched = 0;
-let moves = 0;
-let __hubDone = false;
-function hubScore(s) { window.parent.postMessage({ __hub: 1, type: "score", value: s }, "*"); }
-function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.postMessage({ __hub: 1, type: "finish", score: s }, "*"); }
-let cardOne, cardTwo;
-let disableDeck = false;
-
-function flipCard({target: clickedCard}) {
-    if(cardOne !== clickedCard && !disableDeck) {
-        clickedCard.classList.add("flip");
-        if(!cardOne) {
-            return cardOne = clickedCard;
-        }
-        cardTwo = clickedCard;
-        disableDeck = true;
-        moves++;
-        hubScore(moves);
-        let cardOneImg = cardOne.dataset.emoji,
-        cardTwoImg = cardTwo.dataset.emoji;
-        matchCards(cardOneImg, cardTwoImg);
-    }
+const EMOJI=['🍓','🥝','🍋','🍇','🍒','🥑','🍉','🍑'];
+const board=document.getElementById('cards');
+const movesEl=document.getElementById('moves');
+const pairsEl=document.getElementById('pairs');
+const statusEl=document.getElementById('memory-status');
+let first=null,second=null,locked=false,moves=0,matched=0,__hubDone=false;
+const hubScore=(s)=>window.parent.postMessage({__hub:1,type:'score',value:s},'*');
+function hubFinish(s){if(__hubDone)return;__hubDone=true;window.parent.postMessage({__hub:1,type:'finish',score:s},'*')}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function updateHud(){movesEl.textContent=String(moves);pairsEl.textContent=String(matched)}
+function clearPick(){first=null;second=null;locked=false}
+function choose(card){
+  if(locked||card===first||card.classList.contains('matched'))return;card.classList.add('flip');
+  if(!first){first=card;return}
+  second=card;locked=true;moves++;updateHud();hubScore(moves);
+  if(first.dataset.emoji===second.dataset.emoji){
+    matched++;first.classList.add('matched');second.classList.add('matched');updateHud();statusEl.textContent=matched===8?'Все пары найдены ✦':'Пара найдена';
+    clearPick();if(matched===8)hubFinish(moves);return;
+  }
+  statusEl.textContent='Запомни эти две';setTimeout(()=>{first?.classList.add('shake');second?.classList.add('shake')},260);
+  setTimeout(()=>{first?.classList.remove('shake','flip');second?.classList.remove('shake','flip');statusEl.textContent='';clearPick()},650);
 }
-
-function matchCards(img1, img2) {
-    if(img1 === img2) {
-        matched++;
-        cardOne.removeEventListener("click", flipCard);
-        cardTwo.removeEventListener("click", flipCard);
-        cardOne = cardTwo = "";
-        disableDeck = false;
-        if(matched == 8) { hubFinish(moves); }
-        return;
-    }
-    setTimeout(() => {
-        cardOne.classList.add("shake");
-        cardTwo.classList.add("shake");
-    }, 400);
-
-    setTimeout(() => {
-        cardOne.classList.remove("shake", "flip");
-        cardTwo.classList.remove("shake", "flip");
-        cardOne = cardTwo = "";
-        disableDeck = false;
-    }, 1200);
+function start(){
+  board.innerHTML='';moves=0;matched=0;first=null;second=null;locked=false;__hubDone=false;statusEl.textContent='';updateHud();hubScore(0);
+  const deck=shuffle([...EMOJI,...EMOJI]);
+  deck.forEach((emoji,i)=>{const card=document.createElement('button');card.type='button';card.className='card';card.dataset.emoji=emoji;card.setAttribute('aria-label',`Карточка ${i+1}`);card.innerHTML=`<span class="face front">✦</span><span class="face back">${emoji}</span>`;card.addEventListener('pointerdown',(e)=>{e.preventDefault();choose(card)});board.appendChild(card)});
 }
-
-function shuffleCard() {
-    matched = 0;
-    disableDeck = false;
-    cardOne = cardTwo = "";
-    let arr = [1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8];
-    arr.sort(() => Math.random() > 0.5 ? 1 : -1);
-    cards.forEach((card, i) => {
-        card.classList.remove("flip");
-        const back = card.querySelector(".back-view");
-        card.dataset.emoji = EMOJI[arr[i] - 1];
-        back.textContent = EMOJI[arr[i] - 1];
-        back.style.cssText = "display:flex;align-items:center;justify-content:center;font-size:38px;line-height:1";
-        card.addEventListener("click", flipCard);
-        card.addEventListener("touchstart", (e) => { e.preventDefault(); flipCard({ target: card }); }, { passive: false });
-    });
-}
-
-shuffleCard();
-    
-cards.forEach(card => {
-    card.addEventListener("click", flipCard);
-});
+start();

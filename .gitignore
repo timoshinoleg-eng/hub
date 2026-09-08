@@ -1,10 +1,15 @@
 # зависимости
 node_modules/
 
-# секреты (реальный токен бота лежит в .env, не в example)
+# секреты
 .env
 .env.local
 .env.*.local
+
+# локальная JSON БД содержит raw user_id подписчиков
+server/data.json
+server/.smoke-*.json
+server/.smoke*.json
 
 # логи и артефакты сборки
 *.log

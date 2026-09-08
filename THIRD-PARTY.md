@@ -1,61 +1,33 @@
 # Сторонний код
 
-## Игры: he-is-talha/html-css-javascript-games
+## Игры: `he-is-talha/html-css-javascript-games`
 
-Источник: https://github.com/he-is-talha/html-css-javascript-games
-Лицензия: **MIT** · Copyright (c) 2024 Talha Bin Yousaf
-Проверено: 07.09.2026, 274★, коммит 04.09.2026
+Исходный код игр взят из MIT-licensed проекта `he-is-talha/html-css-javascript-games`. Текст MIT-лицензии и copyright notice должны сохраняться при распространении существенных частей исходного кода.
 
-Текст лицензии:
+MIT-лицензия на код не подтверждает права на сторонние изображения, аудио, шрифты, товарные знаки или узнаваемые чужие игровые бренды. Поэтому production-пайплайн не должен включать внешние/непроверенные runtime-ассеты из vendored games.
 
-```
-MIT License
+## Текущие адаптации
 
-Copyright (c) 2024 Talha Bin Yousaf
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-```
-
-## Что важно понимать про эту лицензию
-
-MIT распространяется **только на код**. Она не покрывает:
-
-- **изображения и звук**, происхождение которых неизвестно;
-- **названия и образы** чужих игр (Pac-Man, Tetris, Flappy Bird, Fruit Ninja и др.);
-- **товарные знаки** третьих лиц.
-
-Поэтому в этот хаб попали только те игры, где механика не защищена, а ассеты
-отсутствуют или заменены нашими.
-
-## Что сделано с исходниками
-
-| Игра | Изменения |
+| Игра | Что изменено |
 |---|---|
-| `merge` (10-2048) | исправлен баг склейки плиток через границу строки; добавлены свайпы; русский текст; убрано название «2048» |
-| `reaction` (35-Whack-A-Mole) | 10 с → 30 с; `touchstart` вместо `click` (иначе задержка 300 мс); русский текст; отправка счёта в хаб |
-| `snake` (24-Snake) | `alert()` + `location.reload()` заменены на экран результата; свайпы; русский текст; автостарт |
-| `memory` (22-Memory) | **8 PNG неизвестного происхождения удалены**, заменены на эмодзи; 32 тега `<img>` вычищены из разметки; удалён сторонний favicon |
-| `sapper`, `quiz`, `echo` | перенесены без изменений, порт запланирован |
+| `merge` | стабильная собственная move-реализация поверх исходной HTML/CSS-основы: корректные merge rules, game-over, no-op swipe, touch; убраны внешние favicon/брендинг; результат интегрирован с hub |
+| `reaction` | мобильный touch, 30-секундная сессия, finish → hub |
+| `snake` | свайпы, локальный рекорд, inline game-over вместо `alert/reload`, finish → hub |
+| `sapper` | touch/flag UX, адаптивная доска, русские строки, seeded daily, score/finish → hub |
+| `quiz` | русский пул вопросов, seeded Fisher–Yates для daily, русские результаты, score/finish → hub |
+| `echo` | русские строки, исправление runtime bug, touch, finish → hub |
+| `memory` | неизвестные PNG удалены и заменены emoji, touch, moves/finish → hub |
 
-## Не используется
+`tools/check.mjs` отклоняет внешние `http(s)` runtime-ресурсы в HTML игр. Для критических переписанных файлов используются canonical overrides в `tools/overrides/`, которые повторно применяются после `npm run vendor`.
 
-12 игр — клоны чужого IP (Pac-Man, Flappy Bird, Fruit Slicer, Space Invaders,
-Asteroids, Frogger, Candy Crush, Doodle Jump, Crossy Road, Tetris, Wordle,
-Tower Blocks), 3 — азартные механики (Blackjack, Poker, Dice Roll).
-Не перенесены в принципе.
+## Перед обновлением upstream
+
+1. Зафиксировать проверяемый upstream commit/tag в handoff/review.
+2. Проверить лицензию и происхождение новых ассетов.
+3. Просмотреть diff до применения production overrides.
+4. Выполнить `npm run vendor && npm run smoke`.
+5. Ручно проверить все включённые игры в мобильном MAX WebView.
+
+## Не использовать без отдельной IP/asset проверки
+
+Клоны, напрямую использующие узнаваемые названия/образы третьих лиц, а также азартные механики не должны автоматически переноситься в продукт только потому, что исходный репозиторий имеет MIT-лицензию.

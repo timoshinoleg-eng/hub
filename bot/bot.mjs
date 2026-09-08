@@ -1,37 +1,19 @@
 /**
- * Регистрация всех обработчиков бота. Ничего не запускает и не трогает сеть —
- * этим занимается bot/index.mjs. Разделение нужно, чтобы прогонять сценарии
- * в bot/smoke.mjs без токена и без обращений к Bot API.
+ * Регистрация обработчиков MAX-бота. Сеть запускает bot/index.mjs.
  */
 import { Bot, Keyboard } from '@maxhub/max-bot-api';
 import { ORG, SISTER_PROJECTS, WEBAPP_URL, BOT_USERNAME, ADMIN_IDS } from './config.mjs';
 import { GAMES } from '../js/games.js';
 import * as db from '../server/db.mjs';
 
-/** Только те игры, что реально портированы — иначе кнопка ведёт в пустоту. */
 const LIVE = GAMES.filter((g) => g.enabled);
 
-const isAdmin = (uid) => !ADMIN_IDS.length || ADMIN_IDS.includes(Number(uid));
+// Fail closed: отсутствие HUB_ADMIN_IDS никого не делает администратором.
+const isAdmin = (uid) => ADMIN_IDS.length > 0 && ADMIN_IDS.includes(Number(uid));
 
-/* ── Клавиатуры ────────────────────────────────────────────────────────── */
-
-/**
- * Ограничения платформы, проверенные по dev.max.ru:
- * до 210 кнопок, до 30 рядов, до 7 кнопок в ряду,
- * но не более 3 если это link / open_app / request_contact / request_geo_location.
- * Все ряды здесь намеренно не длиннее трёх кнопок, чтобы правило выполнялось
- * при любом их типе и при любом количестве проектов в кросс-промо.
- */
 const openAppButton = (text) =>
   WEBAPP_URL ? Keyboard.button.openApp(text, WEBAPP_URL) : Keyboard.button.openApp(text);
 
-/**
- * Глубокая ссылка сразу на игру. Это единственный документально подтверждённый
- * способ передать параметр внутрь мини-приложения MAX — payload попадает в
- * WebAppStartParam и initDataUnsafe.start_param.
- * Если ник бота не задан, отдаём кнопку открытия приложения без параметра:
- * пользователь попадёт в меню хаба, а не в пустоту.
- */
 function playButton(g) {
   if (BOT_USERNAME) return Keyboard.button.link(`${g.emoji} ${g.title}`, `https://max.ru/${BOT_USERNAME}?startapp=g${g.id}`);
   return openAppButton(`${g.emoji} ${g.title}`);
@@ -42,30 +24,22 @@ function mainKeyboard() {
     [openAppButton('🎮 Играть'), Keyboard.button.callback('Во что играть?', 'games')],
     [Keyboard.button.callback('🔔 Уведомить о запуске', 'notify')],
   ];
-
   const links = [];
   if (WEBAPP_URL) links.push(Keyboard.button.link('Открыть игротеку', WEBAPP_URL));
-  // Не больше трёх кнопок-ссылок в ряду — жёсткое требование платформы.
   for (const p of SISTER_PROJECTS.slice(0, 2)) links.push(Keyboard.button.link(p.title, p.url));
   if (links.length) rows.push(links.slice(0, 3));
-
   rows.push([Keyboard.button.callback('Правовая информация', 'legal')]);
   return Keyboard.inlineKeyboard(rows);
 }
 
 function gamesKeyboard() {
   const rows = [];
-  for (let i = 0; i < LIVE.length; i += 3) {
-    rows.push(LIVE.slice(i, i + 3).map(playButton));
-  }
+  for (let i = 0; i < LIVE.length; i += 3) rows.push(LIVE.slice(i, i + 3).map(playButton));
   rows.push([Keyboard.button.callback('« Назад', 'menu')]);
   return Keyboard.inlineKeyboard(rows);
 }
 
-/* ── Тексты ────────────────────────────────────────────────────────────── */
-
 const titles = LIVE.map((g) => `${g.emoji} ${g.title}`).join(', ');
-
 const welcome = (name) =>
   `${name ? name + ', в' : 'В'}ы в игротеке — подборке коротких игр, в которые можно сыграть прямо в чате.\n\n` +
   `Сейчас доступны: ${titles}.\n\n` +
@@ -80,33 +54,21 @@ const legalText =
   `Возрастная маркировка: ${ORG.ageRating}\n` +
   `Команда /forget — удалить все данные, которые мы о вас храним.`;
 
-/* ── Отправка ──────────────────────────────────────────────────────────── */
-
-/**
- * Ответ на нажатие кнопки обязан закрывать «песочные часы» — без вызова
- * answerOnCallback платформа держит кнопку в состоянии ожидания.
- * Ошибку глушим намеренно: упавший ответ не должен ронять весь апдейт.
- */
 async function answer(ctx, text, attachments) {
   await ctx.reply(text, attachments ? { attachments } : {});
   if (ctx.callback) {
-    try {
-      await ctx.answerOnCallback({});
-    } catch {
-      /* кнопка уже не ждёт ответа — не страшно */
-    }
+    try { await ctx.answerOnCallback({}); } catch { /* callback уже закрыт */ }
   }
 }
-
-/* ── Регистрация ───────────────────────────────────────────────────────── */
 
 export function createBot() {
   const bot = new Bot(process.env.BOT_TOKEN || 'stub');
 
+  // Обычная бот-аналитика не связывается с user_id. Identity хранится только
+  // в subscribers после явного действия «Уведомить о запуске».
   const track = (ctx, action, game) =>
-    db.insertEvent({ uid_hash: db.hashUid(ctx.user?.user_id ?? 0), game, action });
+    db.insertEvent({ uid_hash: db.anonId(), game, action });
 
-  /** Игра, закодированная в payload: g<id> — тот же формат, что и в ?startapp=. */
   const gameFromPayload = (p) => {
     const m = /^g([a-z]{2,16})$/.exec(String(p || '').trim());
     return m ? LIVE.find((g) => g.id === m[1]) : null;
@@ -135,7 +97,7 @@ export function createBot() {
 
   bot.command('forget', async (ctx) => {
     if (ctx.user?.user_id) await db.forgetUser(ctx.user.user_id);
-    await answer(ctx, 'Готово. Все ваши данные удалены.');
+    await answer(ctx, 'Готово. Все связанные с вашим аккаунтом данные удалены.');
   });
 
   bot.action('menu', async (ctx) => answer(ctx, welcome(ctx.user?.first_name), [mainKeyboard()]));
@@ -149,7 +111,6 @@ export function createBot() {
       user_id: uid,
       uid_hash: db.hashUid(uid),
       game: null,
-      // В callback-апдейте чат лежит не в update.chat_id, а выводится из сообщения.
       chat_id: Number(ctx.chatId) || null,
     });
     await track(ctx, 'notify_subscribe');
@@ -165,15 +126,7 @@ export function createBot() {
     ]);
   });
 
-  /* ── Рассылка ────────────────────────────────────────────────────────── */
-
-  /**
-   * Платформа пропускает не более двух сообщений в секунду в один диалог.
-   * Разным людям можно чаще, но идём с запасом: 60 мс между отправками
-   * и пауза на 429. Без очереди рассылка на 300 человек ловит лимит гарантированно.
-   */
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
   async function broadcast(text, attachments) {
     const subs = await db.listSubscribers();
     let sent = 0;
@@ -216,8 +169,6 @@ export function createBot() {
   bot.on('message_created', async (ctx) => {
     const t = (ctx.message?.body?.text || '').trim();
     if (!t || t.startsWith('/')) return;
-    // Любой текст, который не команда, — показываем меню. Молчащий бот
-    // выглядит сломанным, а это напрямую бьёт по удержанию.
     await answer(ctx, 'Я умею только запускать игры 👇', [mainKeyboard()]);
   });
 

@@ -1,27 +1,12 @@
 {
-  "name": "ofeliya-hub",
-  "version": "0.2.0",
-  "private": true,
-  "type": "module",
-  "description": "Хаб мини-игр для мессенджера MAX. Фронтенд — статика без сборки; сервер событий и бот — Node.",
-  "scripts": {
-    "dev": "npx --yes serve . -l 5173",
-    "server": "node --env-file=.env server/index.mjs",
-    "bot": "node --env-file=.env bot/index.mjs",
-    "vendor": "node tools/vendor.mjs",
-    "check": "node tools/check.mjs",
-    "smoke": "node tools/check.mjs && node server/smoke.mjs && node bot/smoke.mjs && node tools/daily.mjs && node tools/duel.mjs",
-    "smoke:server": "node server/smoke.mjs",
-    "smoke:bot": "node bot/smoke.mjs",
-    "smoke:daily": "node tools/daily.mjs",
-    "smoke:duel": "node tools/duel.mjs"
+  "name":"ofeliya-hub","version":"0.2.0","private":true,"type":"module",
+  "description":"Хаб мини-игр для мессенджера MAX. Фронтенд — статика без сборки; сервер событий и бот — Node.",
+  "scripts":{
+    "dev":"npx --yes serve . -l 5173","server":"node --env-file=.env server/index.mjs","bot":"node --env-file=.env bot/index.mjs","vendor":"node tools/vendor.mjs && node tools/vendor-overrides.mjs","check":"node tools/check.mjs",
+    "smoke":"node tools/check.mjs && node tools/product-contract.mjs && node tools/bridge-contract.mjs && node tools/track-transport.mjs && node tools/max-auth.mjs && node tools/merge.mjs && node tools/daily-seed.mjs && node tools/engagement.mjs && node tools/progress.mjs && node server/smoke.mjs && node bot/smoke.mjs && node tools/daily.mjs && node tools/duel.mjs",
+    "smoke:product":"node tools/product-contract.mjs","smoke:bridge":"node tools/bridge-contract.mjs","smoke:track":"node tools/track-transport.mjs","smoke:auth":"node tools/max-auth.mjs","smoke:merge":"node tools/merge.mjs","smoke:daily-seed":"node tools/daily-seed.mjs","smoke:engagement":"node tools/engagement.mjs","smoke:progress":"node tools/progress.mjs","smoke:server":"node server/smoke.mjs","smoke:bot":"node bot/smoke.mjs","smoke:daily":"node tools/daily.mjs","smoke:duel":"node tools/duel.mjs"
   },
-  "dependencies": {
-    "@maxhub/max-bot-api": "^0.3.1",
-    "fastify": "^5.2.0",
-    "pg": "^8.13.0"
-  },
-  "devDependencies": {
-    "pino-pretty": "^13.0.0"
-  }
+  "engines":{"node":">=20"},
+  "dependencies":{"@maxhub/max-bot-api":"^0.3.1","fastify":"^5.2.0","pg":"^8.13.0"},
+  "devDependencies":{"pino-pretty":"^13.0.0"}
 }
