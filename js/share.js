@@ -1,11 +1,4 @@
-/**
- * Шаринг-карточка. Рисуется на canvas — ни одного изображения в сборке,
- * значит и никаких лицензионных рисков по ассетам.
- *
- * Карточка нужна не ради красоты: в MAX нет каталога мини-приложений,
- * поэтому результат игры — единственный повод показать хаб другому человеку.
- */
-
+/** Результат для шаринга: canvas без внешних изображений и системных emoji. */
 const W = 900;
 const H = 900;
 
@@ -19,48 +12,80 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-export function drawCard({ title, emoji, score, unit, hubName = 'Игротека' }) {
+function drawBrandMark(ctx, cx, cy, size, accent, accent2) {
+  const g = ctx.createLinearGradient(cx - size, cy - size, cx + size, cy + size);
+  g.addColorStop(0, accent || '#7568ff');
+  g.addColorStop(1, accent2 || '#4ce3e8');
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(0, -size);
+  ctx.lineTo(size * .28, -size * .28);
+  ctx.lineTo(size, 0);
+  ctx.lineTo(size * .28, size * .28);
+  ctx.lineTo(0, size);
+  ctx.lineTo(-size * .28, size * .28);
+  ctx.lineTo(-size, 0);
+  ctx.lineTo(-size * .28, -size * .28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+export function drawCard({
+  title, score, unit, hubName = 'Игротека', accent = '#7568ff', accent2 = '#4ce3e8',
+}) {
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
   const x = c.getContext('2d');
 
-  const g = x.createLinearGradient(0, 0, W, H);
-  g.addColorStop(0, '#1b2a4a');
-  g.addColorStop(1, '#3a1f52');
-  x.fillStyle = g;
+  const bg = x.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#11182a');
+  bg.addColorStop(1, '#17101f');
+  x.fillStyle = bg;
   x.fillRect(0, 0, W, H);
 
-  x.textAlign = 'center';
+  x.globalAlpha = .16;
+  x.fillStyle = accent;
+  x.beginPath();
+  x.arc(760, 90, 260, 0, Math.PI * 2);
+  x.fill();
+  x.fillStyle = accent2;
+  x.beginPath();
+  x.arc(80, 760, 250, 0, Math.PI * 2);
+  x.fill();
+  x.globalAlpha = 1;
 
+  x.textAlign = 'center';
   x.font = '700 34px system-ui, sans-serif';
-  x.fillStyle = 'rgba(255,255,255,.55)';
+  x.fillStyle = 'rgba(255,255,255,.58)';
   x.fillText(hubName.toUpperCase(), W / 2, 110);
 
-  x.font = '120px system-ui, "Segoe UI Emoji", sans-serif';
-  x.fillText(emoji || '🎮', W / 2, 300);
+  drawBrandMark(x, W / 2, 255, 72, accent, accent2);
 
   x.font = '700 56px system-ui, sans-serif';
   x.fillStyle = '#fff';
-  x.fillText(title, W / 2, 400);
+  x.fillText(title, W / 2, 405);
 
   x.font = '800 150px system-ui, sans-serif';
-  x.fillStyle = '#ffd54a';
-  x.fillText(String(score ?? 0), W / 2, 560);
+  x.fillStyle = '#fff';
+  x.fillText(String(score ?? 0), W / 2, 570);
 
   if (unit) {
     x.font = '500 34px system-ui, sans-serif';
     x.fillStyle = 'rgba(255,255,255,.7)';
-    x.fillText(unit, W / 2, 615);
+    x.fillText(unit, W / 2, 625);
   }
 
-  x.fillStyle = 'rgba(255,255,255,.1)';
+  x.fillStyle = 'rgba(255,255,255,.09)';
   roundRect(x, 130, 700, W - 260, 90, 45);
   x.fill();
 
   x.font = '600 34px system-ui, sans-serif';
   x.fillStyle = '#fff';
-  x.fillText('Сможешь больше?', W / 2, 758);
+  x.fillText('Сможешь побить мой результат?', W / 2, 758);
 
   return c;
 }
@@ -72,5 +97,7 @@ export function cardDataUrl(opts) {
 /** Текст для шаринга: число + призыв + deep link. */
 export function shareText({ title, score, unit, link }) {
   const s = score == null ? '' : ` — ${score}${unit ? ' ' + unit : ''}`;
-  return link ? `Я играю в «${title}»${s}. Попробуй меня обогнать 👇\n${link}` : `Я играю в «${title}»${s}.`;
+  return link
+    ? `Я играю в «${title}»${s}. Попробуй меня обогнать.\n${link}`
+    : `Я играю в «${title}»${s}.`;
 }

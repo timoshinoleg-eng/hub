@@ -1,0 +1,49 @@
+
+/* Visual polish v2: brand identity, mobile readability and simplified result hierarchy. */
+.brand-glyph,.game-icon,.daily-icon,.result-icon{display:block;width:100%;height:100%;color:currentColor}
+.brand-mark{color:#fff}
+.kicker,.eyebrow{font-size:10.5px}
+.hero-head p{font-size:13.5px;line-height:1.35}
+.streak-chip{min-width:68px;padding:8px 10px;font-size:11.5px}
+.streak-chip span{display:block}
+.streak-chip .streak-empty{font-size:11.5px;line-height:1.15;color:#ffd57f;padding:3px 0}
+.streak-chip strong{font-size:20px}
+.daily-emoji{width:52px;height:52px;display:grid;place-items:center}
+.daily-icon{width:48px;height:48px;color:#fff;filter:drop-shadow(0 8px 12px rgba(0,0,0,.22))}
+.daily-copy p{font-size:13px;line-height:1.35}
+.gbadge{font-size:10px}
+.gt i{font-size:12.5px}
+.gfoot{font-size:11.5px}
+.ge{color:var(--game2);padding:10px}
+.ge .game-icon{width:100%;height:100%}
+.progress-strip{margin:0 0 22px}
+.pstat{padding:11px 8px}
+.pstat strong{font-size:19px}
+.pstat span{font-size:10.5px}
+#game-meta{font-size:10.5px}
+.mfoot{font-size:11px}
+.result-emoji{display:none}
+.result-icon-wrap{width:58px;height:58px;display:grid;place-items:center;margin:12px auto 7px;padding:10px;border-radius:19px;background:rgba(255,255,255,.06);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.result-icon{filter:drop-shadow(0 8px 14px rgba(0,0,0,.26))}
+.result-links{display:flex;justify-content:center;gap:18px;margin-top:2px}
+.result-link{appearance:none;border:0;background:transparent;color:var(--mut);font:650 12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:9px 5px;cursor:pointer}
+.result-link:active{color:#fff}
+
+@media(max-width:380px){
+  #view-menu{padding-left:10px;padding-right:10px}
+  .hero-head{gap:8px}
+  .brand-mark{width:40px;height:40px;border-radius:13px}
+  .hero-head h1{font-size:24px}
+  .hero-head p{font-size:12.5px}
+  .game-grid{gap:8px}
+  .gcard{min-height:148px;padding:12px}
+  .ge{width:42px;height:42px;border-radius:14px;padding:9px}
+  .gt b{font-size:15px}
+  .gt i{font-size:12px}
+  .gbadge{font-size:9.5px;padding:4px 6px}
+  .gfoot{font-size:11px}
+}
+@media(max-width:335px){
+  .game-grid{grid-template-columns:1fr}
+  .gcard{min-height:126px}
+}
