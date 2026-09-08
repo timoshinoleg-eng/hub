@@ -41,7 +41,10 @@ assert.ok(hub.includes("track('new_record'") && hub.includes("track('daily_compl
 assert.ok(hub.includes("track('return_visit'") && hub.includes("track('first_visit'"), 'return/first visit events are emitted by the shell');
 assert.ok(hub.includes("bridge.haptic('selection')"), 'MAX haptic feedback stays integrated');
 assert.ok(hub.includes('Начни<br>серию'), 'zero streak has a meaningful empty state');
-assert.ok(hub.includes('✦ СЕГОДНЯ'), 'daily badge is localized');
+assert.ok(hub.includes('✦ ЕЖЕДНЕВНО'), 'non-hero daily-capable game is not mislabeled as today');
+assert.ok(hub.includes('const catalog = all.filter((g) => g.id !== daily?.id)'), 'daily hero is not duplicated in the game grid');
+assert.ok(hub.includes("style.setProperty('--active-game'"), 'game shell inherits current game accent');
+assert.ok(hub.includes("f.style.opacity = '1'"), 'iframe reveal waits for embedded config handshake');
 assert.ok(hub.includes('result-icon-wrap') && !hub.includes('<div class="result-emoji">'), 'result loop uses local vector identity');
 assert.ok(hub.includes('hub_notify_prompted_v1'), 'subscription prompt is rate-limited instead of persistent');
 
@@ -51,6 +54,7 @@ for (const token of ['daily-card', 'game-grid', 'record-pill', 'game-tip', 'conf
 assert.ok(hubCss.includes('@media(max-width:380px)'), '360/375px layouts have an explicit compact treatment');
 assert.ok(hubCss.includes('.gbadge{font-size:10px}'), 'functional badge text is no longer sub-10px');
 assert.ok(hubCss.includes('.result-icon-wrap'), 'result card has product-owned icon styling');
+assert.ok(hubCss.includes('--active-game'), 'active game accent is visible in game/result shell');
 
 assert.ok(!share.includes('Segoe UI Emoji') && !share.includes('emoji ||'), 'share card no longer depends on system emoji');
 assert.ok(share.includes('drawBrandMark'), 'share card carries the product visual mark');
@@ -64,15 +68,22 @@ const memory = read('games/memory/script.js');
 assert.ok(memory.includes('function shuffle(a)') && memory.includes("board.innerHTML=''"), 'memory has clean Fisher-Yates restartable board');
 assert.ok(!read('games/memory/index.html').includes('<li class="card">'), 'memory no longer ships giant static card markup');
 const snake = read('games/snake/script.js');
+const snakeCss = read('games/snake/style.css');
 assert.ok(snake.includes('while(occupied(x,y))'), 'snake food cannot spawn inside snake');
 assert.ok(!snake.includes('hub-again') && !snake.includes('location.reload'), 'snake uses hub result loop only');
 assert.ok(snake.includes('visibilitychange'), 'snake pauses while hidden');
+assert.ok(snake.includes('snake-head') && snake.includes('data-dir'), 'snake has product-owned directional character head');
+assert.ok(snakeCss.includes('.snake-head::before') && snakeCss.includes('.food::after'), 'snake has eyes and food character detail');
 const quiz = read('games/quiz/script.js');
+const quizCss = read('games/quiz/style.css');
 assert.ok(quiz.includes('questionBank.slice(0,10)'), 'daily quiz is intentionally ten questions');
 assert.ok(quiz.includes("button.classList.add('correct')") && quiz.includes("button.classList.add('wrong')"), 'quiz has immediate answer feedback');
 assert.ok(!read('games/quiz/index.html').includes('id="submit"'), 'quiz has no submit-button friction');
+assert.ok(quizCss.includes('counter-reset:answer') && quizCss.includes('.option::before'), 'quiz answer cards have game-like A/B/C/D chips');
 const sapper = read('games/sapper/script.js');
+const sapperCss = read('games/sapper/style.css');
 assert.ok(sapper.includes('aria-pressed') && sapper.includes('opened-count'), 'sapper exposes clear flag mode and progress HUD');
+assert.ok(sapperCss.includes('@keyframes tileReveal') && sapperCss.includes('@keyframes flagPop'), 'sapper has reveal and flag feedback');
 const merge = read('games/merge/script.js');
 assert.ok(merge.includes("cell.textContent=v?String(v):''"), 'merge empty cells are visually empty');
 assert.ok(merge.includes("Math.random()<.9?2:4"), 'merge spawns standard 2/4 tiles');

@@ -1,5 +1,5 @@
-
-/* Visual polish v2: brand identity, mobile readability and simplified result hierarchy. */
+/* Visual polish v3: preserve v2 identity, tighten hierarchy, improve game transitions. */
+:root{--active-game:#6f63ff}
 .brand-glyph,.game-icon,.daily-icon,.result-icon{display:block;width:100%;height:100%;color:currentColor}
 .brand-mark{color:#fff}
 .kicker,.eyebrow{font-size:10.5px}
@@ -8,9 +8,13 @@
 .streak-chip span{display:block}
 .streak-chip .streak-empty{font-size:11.5px;line-height:1.15;color:#ffd57f;padding:3px 0}
 .streak-chip strong{font-size:20px}
+.daily-shell{margin-bottom:18px}
+.daily-card{padding:17px;border-radius:22px}
+.daily-top{margin-bottom:12px}
 .daily-emoji{width:52px;height:52px;display:grid;place-items:center}
 .daily-icon{width:48px;height:48px;color:#fff;filter:drop-shadow(0 8px 12px rgba(0,0,0,.22))}
 .daily-copy p{font-size:13px;line-height:1.35}
+.daily-play{margin-top:12px;min-height:46px}
 .gbadge{font-size:10px}
 .gt i{font-size:12.5px}
 .gfoot{font-size:11.5px}
@@ -22,9 +26,14 @@
 .pstat span{font-size:10.5px}
 #game-meta{font-size:10.5px}
 .mfoot{font-size:11px}
+.gbar{position:relative}
+.gbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,transparent,var(--active-game),transparent);opacity:.75;pointer-events:none}
+#game-score{background:linear-gradient(135deg,var(--active-game),#557cff)}
+#game-frame{transition:opacity .16s ease}
 .result-emoji{display:none}
 .result-icon-wrap{width:58px;height:58px;display:grid;place-items:center;margin:12px auto 7px;padding:10px;border-radius:19px;background:rgba(255,255,255,.06);color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
 .result-icon{filter:drop-shadow(0 8px 14px rgba(0,0,0,.26))}
+.btn.primary{background:linear-gradient(135deg,var(--active-game),#557cff)}
 .result-links{display:flex;justify-content:center;gap:18px;margin-top:2px}
 .result-link{appearance:none;border:0;background:transparent;color:var(--mut);font:650 12px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:9px 5px;cursor:pointer}
 .result-link:active{color:#fff}
@@ -42,8 +51,10 @@
   .gt i{font-size:12px}
   .gbadge{font-size:9.5px;padding:4px 6px}
   .gfoot{font-size:11px}
+  .daily-card{padding:15px}
 }
 @media(max-width:335px){
   .game-grid{grid-template-columns:1fr}
   .gcard{min-height:126px}
 }
+@media(prefers-reduced-motion:reduce){#game-frame{transition:none}}

@@ -55,6 +55,8 @@ function renderMenu() {
   const today = dailySeed();
   const summary = getSummary(today);
   const daily = dailyGameForDate(today);
+  const all = visible(SHOW_ALL);
+  const catalog = all.filter((g) => g.id !== daily?.id);
 
   $('#streak-chip').innerHTML = summary.streak > 0
     ? `<strong>${summary.streak}</strong><span>дн. подряд</span>`
@@ -81,7 +83,7 @@ function renderMenu() {
 
   const list = $('#games');
   list.innerHTML = '';
-  for (const g of visible(SHOW_ALL)) {
+  for (const g of catalog) {
     const pg = getGameProgress(g.id);
     const card = el('button', 'gcard' + (g.enabled ? '' : ' draft'));
     card.dataset.id = g.id;
@@ -89,14 +91,14 @@ function renderMenu() {
     card.style.setProperty('--game2', g.accent2 || g.accent || '#4ce3e8');
     card.innerHTML =
       `<div class="gcard-top"><span class="ge">${iconSvg(g.icon)}</span>` +
-      `<span class="gbadge ${g.cfg?.daily ? 'daily' : ''}">${g.cfg?.daily ? '✦ СЕГОДНЯ' : esc(g.genre || g.length)}</span></div>` +
+      `<span class="gbadge ${g.cfg?.daily ? 'daily' : ''}">${g.cfg?.daily ? '✦ ЕЖЕДНЕВНО' : esc(g.genre || g.length)}</span></div>` +
       `<span class="gt"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span>` +
       `<span class="gfoot"><span class="gbest">${esc(pg.best == null ? g.length : formatBest(g, pg.best))}</span>` +
       `<span class="garrow">›</span></span>`;
     card.addEventListener('click', () => openGame(g.id));
     list.appendChild(card);
   }
-  $('#count').textContent = `${visible(SHOW_ALL).length} игр`;
+  $('#count').textContent = daily ? `${catalog.length} игр + вызов` : `${catalog.length} игр`;
 }
 
 let offBack = () => {};
@@ -125,6 +127,7 @@ function openGame(id, challenge = null) {
   lastScoreHaptic = 0;
 
   const pg = getGameProgress(g.id);
+  document.documentElement.style.setProperty('--active-game', g.accent || '#6f63ff');
   $('#game-title').textContent = g.title;
   $('#game-meta').textContent = `${g.genre} · ${formatBest(g, pg.best)}`;
   $('#game-score').textContent = '';
@@ -133,7 +136,9 @@ function openGame(id, challenge = null) {
   if (g.cfg?.daily) src += '?seed=' + dailySeed();
   if (challenge != null) src += (src.includes('?') ? '&' : '?') + 'challenge=' + challenge;
 
-  $('#game-frame').src = src;
+  const frame = $('#game-frame');
+  frame.style.opacity = '0';
+  frame.src = src;
   $('#overlay').innerHTML = '';
   document.body.dataset.view = 'game';
   track('open_game', g.id);
@@ -162,6 +167,7 @@ function onMessage(e) {
   if (d.type === 'ready') {
     if (!state.game || d.game !== state.game.id) return;
     f.contentWindow.postMessage({ __hub: 1, type: 'cfg', game: d.game, cfg: state.game.cfg || {} }, '*');
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; }));
     return;
   }
   if (!state.game) return;
