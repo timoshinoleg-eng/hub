@@ -9,9 +9,9 @@
 
   // Standalone game pages remain self-contained; only the iframe presentation
   // gets the compact branded viewport used by the hub shell.
-  if (window.parent !== window) {
-    document.documentElement.classList.add('hub-embedded');
-    document.documentElement.setAttribute('data-hub-game', game);
+  if (window.parent !== window && document.documentElement) {
+    if (document.documentElement.classList) document.documentElement.classList.add('hub-embedded');
+    if (document.documentElement.setAttribute) document.documentElement.setAttribute('data-hub-game', game);
   }
 
   var cfg = null;
