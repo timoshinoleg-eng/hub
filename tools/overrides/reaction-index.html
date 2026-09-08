@@ -1,26 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-    <title>Реакция</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <main>
-      <h1>Реакция</h1>
-      <h2>Счёт: <span class="score">0</span></h2>
-      <button id="start" type="button" onclick="startGame()">Начать</button>
-      <div class="game" aria-label="Игровое поле">
-        <div class="hole"><div class="mole" aria-label="цель"></div></div>
-        <div class="hole"><div class="mole" aria-label="цель"></div></div>
-        <div class="hole"><div class="mole" aria-label="цель"></div></div>
-        <div class="hole"><div class="mole" aria-label="цель"></div></div>
-        <div class="hole"><div class="mole" aria-label="цель"></div></div>
-        <div class="hole"><div class="mole" aria-label="цель"></div></div>
-      </div>
-    </main>
-    <script src="script.js"></script>
-    <script src="../_boot.js" data-game="reaction"></script>
-  </body>
-</html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Реакция</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header class="rhead"><span>⚡ 30 СЕКУНД</span><h1>Лови момент</h1><p>Попадай по целям и держи серию.</p></header>
+  <div class="hud"><div><small>СЧЁТ</small><strong class="score">0</strong></div><div><small>СЕРИЯ</small><strong id="combo">×0</strong></div><div><small>ВРЕМЯ</small><strong id="time">30</strong></div></div>
+  <div class="timer-track"><i id="time-bar"></i></div>
+  <button id="start" type="button">Начать раунд</button>
+  <div class="game" aria-label="Игровое поле">${'<div class="hole"><div class="mole" role="button" aria-label="цель"></div></div>'.repeat(6)}</div>
+</main>
+<script src="script.js"></script><script src="../_boot.js" data-game="reaction"></script>
+</body></html>

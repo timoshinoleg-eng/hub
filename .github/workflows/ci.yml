@@ -1,14 +1,11 @@
 name: CI
-
 on:
   push:
     branches: [main, 'fix/**', 'feat/**']
   pull_request:
     branches: [main]
-
 permissions:
   contents: read
-
 jobs:
   smoke:
     runs-on: ubuntu-latest
@@ -33,6 +30,8 @@ jobs:
         run: npm run smoke:merge
       - name: Daily timezone boundary
         run: npm run smoke:daily-seed
+      - name: Local progression
+        run: npm run smoke:progress
       - name: Server contracts
         run: npm run smoke:server
       - name: Bot contracts
