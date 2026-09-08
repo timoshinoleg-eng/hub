@@ -19,11 +19,13 @@ function __mergeLine(line) {
 function __mergeApplyMove(board, direction, width = 4) {
   const next = board.slice();
   let gained = 0;
+
   for (let n = 0; n < width; n++) {
     const indices = [];
     for (let i = 0; i < width; i++) {
       indices.push(direction === 'left' || direction === 'right' ? n * width + i : i * width + n);
     }
+
     let values = indices.map((i) => board[i]);
     const reverse = direction === 'right' || direction === 'down';
     if (reverse) values = values.reverse();
@@ -32,7 +34,12 @@ function __mergeApplyMove(board, direction, width = 4) {
     const out = reverse ? r.line.slice().reverse() : r.line;
     indices.forEach((idx, i) => { next[idx] = out[i]; });
   }
-  return { board: next, gained, changed: next.some((v, i) => v !== board[i]) };
+
+  return {
+    board: next,
+    gained,
+    changed: next.some((v, i) => v !== board[i]),
+  };
 }
 
 function __mergeCanMove(board, width = 4) {
@@ -56,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let board = Array(width * width).fill(0);
   let score = 0;
   let ended = false;
+
   const colors = {
     0: '#afa192', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#ffcea4',
     32: '#e8c064', 64: '#ffab6e', 128: '#fd9982', 256: '#ead79c',
@@ -93,10 +101,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!__mergeCanMove(board, width)) finish('Игра окончена');
       return;
     }
+
     board = r.board;
     score += r.gained;
     spawn();
     render();
+
     if (board.some((v) => v >= 2048)) finish('Победа!');
     else if (!__mergeCanMove(board, width)) finish('Игра окончена');
   }
@@ -113,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gridDisplay.appendChild(cell);
     cells.push(cell);
   }
+
   resultDisplay.textContent = '';
   spawn();
   spawn();
