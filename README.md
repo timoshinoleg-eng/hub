@@ -1,115 +1,132 @@
 # Игротека — хаб мини-игр для MAX
 
-Фронтенд — статика без сборки: никакого бандлера, залить папку на HTTPS-хостинг
-и указать URL в настройках бота. Бэкенд — сервер событий на Fastify и бот на
-официальном SDK `@maxhub/max-bot-api`.
+Небольшой no-build хаб HTML5-игр для MAX: статический frontend, Fastify-сервер событий и бот на `@maxhub/max-bot-api`.
 
-```
-hub/
-  index.html          хаб: меню + iframe с игрой
-  css/hub.css
-  js/bridge.js        адаптер MAX Bridge (всё через feature detection)
-  js/games.js         манифест игр — единственное место описания игры
-  js/main.js          роутинг, результат, шаринг, согласие на ПДн
-  js/share.js         карточка результата на canvas
-  js/track.js         сборщик событий: хеш вместо user_id, явное согласие
-  games/_boot.js      мост игра ↔ хаб (postMessage)
-  games/<id>/         перенесённые игры
-  server/index.mjs    POST /ev, /sub, /forget · GET /stats, /export.csv, /health
-  server/db.mjs       Postgres или JSON-файл; HMAC-хеш вместо сырого id
-  bot/index.mjs       точка входа: токен, БД, polling
-  bot/bot.mjs         сценарии и клавиатуры (без сети — тестируется)
-  bot/config.mjs      реквизиты организации и кросс-промо
-  legal/POLICY.md     шаблон политики ПДн (152-ФЗ)
-  legal/BOT-CARD.md   что писать в каждое поле карточки бота
-  COMPAT.md           совместимость с уже работающими проектами в MAX
-  THIRD-PARTY.md      лицензии и что именно мы меняли в играх
-  tools/vendor.mjs    перенос + патчи (идемпотентен)
-  tools/check.mjs     smoke-проверка после переноса
+## Архитектура
+
+```text
+index.html / css/          оболочка хаба
+js/bridge.js               capability-adapter MAX Bridge
+js/games.js                единый манифест игр
+js/main.js                 меню, iframe, result/share/duel/consent
+js/track.js                анонимная аналитика + signed initData после consent
+js/daily.js                единая граница «пазла дня» Europe/Moscow
+games/_boot.js             одноразовый postMessage handshake iframe ↔ hub
+games/<id>/                локальные игры без внешних runtime-ассетов
+server/max-auth.mjs        HMAC-проверка MAX WebApp initData
+server/index.mjs           /ev, /sub, /forget, /stats, /export.csv, /health
+server/db.mjs              Postgres production / JSON только dev-test
+bot/                       MAX bot
+legal/                     шаблоны правовых документов
+tools/                     smoke tests, vendor и стабильные overrides
 ```
 
-## Запуск локально
+## Требования
+
+- Node.js 20+
+- HTTPS для Mini App и production API
+- Postgres для production
+- действующий MAX `BOT_TOKEN`
+
+## Локальный запуск
 
 ```bash
-cd hub
-npm install
-npx --yes serve . -l 5173     # или python -m http.server 5173
+npm ci
+npm run smoke
+npm run dev
 ```
 
-В браузере `window.WebApp` не определён — хаб это переживает и работает без
-нативных функций MAX. Отдельная dev-сборка не нужна.
+Для локального `server`/`bot` создайте `.env` из `.env.example`. JSON storage допустим только для dev/test и не должен использоваться одновременно несколькими production-процессами.
 
-## Проверка перед выкладкой
+## Production-конфигурация
+
+Обязательные параметры:
+
+```env
+NODE_ENV=production
+BOT_TOKEN=...
+DATABASE_URL=postgres://...
+HUB_HASH_SALT=<случайный секрет >= 32 символов>
+HUB_ADMIN_TOKEN=<отдельный случайный секрет >= 32 символов>
+HUB_ADMIN_IDS=<MAX user_id администраторов бота через запятую>
+HUB_CORS_ORIGIN=https://games.example.ru
+HUB_WEBAPP_URL=https://games.example.ru
+HUB_BOT_USERNAME=id0000000000_bot
+```
+
+Production server откажется запускаться без Postgres, `BOT_TOKEN`, безопасного `HUB_ADMIN_TOKEN` и HTTPS-origin. `db.init()` отдельно откажется работать с отсутствующим/дефолтным/коротким `HUB_HASH_SALT`. Production bot также откажется использовать JSON storage.
+
+### Authentication contract
+
+`initDataUnsafe` используется только для UX/navigation и **не является доверенной identity**. Для операций, которым нужен пользователь, frontend передаёт подписанный `WebApp.initData`; сервер:
+
+1. разбирает параметры;
+2. исключает `hash`, сортирует остальные поля;
+3. проверяет HMAC-SHA256 по `BOT_TOKEN`;
+4. проверяет `auth_date`;
+5. только после этого получает `user.id`.
+
+`POST /sub` и `POST /forget` не принимают self-asserted `user_id`. `/stats` и `/export.csv` закрыты `Authorization: Bearer <HUB_ADMIN_TOKEN>`.
+
+## Privacy contract
+
+До явного consent игровые события отправляются анонимно и не содержат MAX identity или `initData`. Локальная история также не хранит `user_id`/`initData`.
+
+После consent signed `initData` может передаваться серверу для проверки пользователя. В analytics БД сохраняется HMAC-псевдоним, а raw `user_id` хранится только в таблице подписчиков, где он нужен для отправки уведомления. `/forget` удаляет подписчика и связанные pseudonymous events.
+
+## Проверки
 
 ```bash
-npm run smoke          # три проверки подряд: ассеты, сервер, бот
+npm run smoke
 ```
 
-- `tools/check.mjs` — битые ссылки в играх, чужие ассеты, наличие `_boot.js` и viewport.
-- `server/smoke.mjs` — 20 проверок эндпоинтов через `app.inject()`: валидация
-  входящих, CORS, наличие сырого id в выгрузке, удаление данных по `/forget`.
-- `bot/smoke.mjs` — прогон всех сценариев на настоящих `Context`/`Keyboard` из SDK
-  без токена: клавиатуры проверяются на лимиты платформы (≤30 рядов, ≤7 кнопок
-  в ряду, ≤3 ссылочных), подписка и удаление данных пишутся в БД.
+Полный smoke suite включает:
 
-Ни один из этих прогонов не обращается к сети.
+- проверку локальных ассетов и отсутствия внешних runtime-ресурсов в играх;
+- контракт одноразового iframe handshake;
+- browser transport и pre-consent privacy contract;
+- MAX `initData` HMAC/freshness contract;
+- механику Merge;
+- московскую границу daily;
+- server auth/CORS/delete/export contracts;
+- сценарии бота и fail-closed admin;
+- deterministic daily для Sapper/Quiz;
+- duel logic.
 
-## Запуск боевых процессов
+GitHub Actions запускает `npm ci && npm run smoke` на push и pull request.
+
+## Vendor workflow
+
+Исходный пакет игр используется только как upstream-источник. После базовых патчей применяются стабильные production overrides:
 
 ```bash
-cp .env.example .env    # заполнить BOT_TOKEN, HUB_HASH_SALT, HUB_WEBAPP_URL, HUB_BOT_USERNAME
-npm run server          # сервер событий, порт 8787
-npm run bot             # бот, long polling
+npm run vendor
+npm run check
 ```
 
-Без `DATABASE_URL` сервер пишет в `server/data.json` — этого хватит на софт-лонч.
-Для продакшена задайте `DATABASE_URL` на Postgres в РФ (требование 152-ФЗ),
-схема создаётся сама при старте.
+`tools/check.mjs` проверяет, что критические Merge/Quiz файлы совпадают с каноническими copies в `tools/overrides/`. Поэтому повторный vendor не должен возвращать уже исправленные gameplay/determinism ошибки.
 
-## Перенос игр из пакета
+Новые версии upstream нельзя принимать автоматически: сначала проверить лицензию/ассеты, diff и `npm run smoke`.
 
-```bash
-git clone --depth 1 https://github.com/he-is-talha/html-css-javascript-games.git ../.tmp-pack
-npm run vendor     # node tools/vendor.mjs
-npm run check      # ссылки, ассеты, _boot.js
-```
+## Доступные игры
 
-`vendor.mjs` можно запускать сколько угодно: он удаляет целевую папку, копирует
-заново и применяет патчи. Если патч перестал находиться — скрипт падает с явной
-ошибкой, а не молча пропускает правку.
+Текущий manifest содержит семь включённых игр: Merge, Reaction, Snake, Sapper, Quiz, Echo и Memory. Перед публичным релизом каждая включённая игра должна пройти ручной smoke на целевых смартфонах/MAX WebView; `enabled: false` используется для игры, которая не прошла acceptance.
 
-## Деплой
+## Deploy checklist
 
-1. Залить содержимое `hub/` на HTTPS-хостинг (VK Cloud / Yandex Cloud).
-   Домен — только латиница, цифры, точка и дефис: это требование платформы.
-2. `business.max.ru` → Чат-боты → Перейти → Расширенные настройки → Настроить
-3. Вставить URL мини-приложения, выбрать кнопку **«Играть»**, сохранить.
-   Кнопка появляется сразу, повторная модерация не требуется.
-4. В `index.html` задать `HUB_CONFIG.bot` — ник бота (`idИНН_bot`).
-   Без него deep link в шаринг-карточке не формируется.
-5. Поднять `npm run server` и `npm run bot`, указать `HUB_WEBAPP_URL` в `.env`.
+- [ ] `npm run smoke` зелёный локально и в GitHub Actions
+- [ ] production env заполнен реальными секретами; дефолтных значений нет
+- [ ] Postgres размещён согласно требованиям оператора к локализации данных
+- [ ] `bot/config.mjs` содержит реальные реквизиты оператора
+- [ ] `index.html` содержит реальные `HUB_CONFIG.bot`, `policyUrl`, `offerUrl`, `orgName`
+- [ ] политика/оферта опубликованы и проверены специалистом до запуска
+- [ ] Mini App и API доступны только по HTTPS
+- [ ] `/stats` и `/export.csv` без Bearer token возвращают 401
+- [ ] `/sub`/`/forget` с поддельным или просроченным initData возвращают 401
+- [ ] все включённые игры пройдены вручную в MAX на смартфоне
+- [ ] в консоли нет 404 и внешних runtime-запросов из `games/`
+- [ ] ingress/WAF ограничивает частоту запросов к публичному `/ev`
 
-## Добавить игру
+## Намеренно вне текущего foundation
 
-1. `tools/vendor.mjs` → добавить строку в `GAMES`
-2. `js/games.js` → описать карточку, `enabled: true`, и `cfg` с селекторами счёта
-3. При необходимости добавить патчи в `PATCHES`
-
-Больше ничего править не нужно: меню хаба, кнопки бота, шаринг и аналитика
-читают один и тот же манифест.
-
-## Чек перед софт-лончем
-
-- [ ] `npm run smoke` — всё зелёное
-- [ ] Свободен слот бота: не больше 5 ботов на организацию/ИП
-- [ ] `bot/config.mjs` — реквизиты `ORG`, ссылки на политику и оферту
-- [ ] Политика ПДн опубликована по `ORG.policyUrl` и ссылка открывается
-- [ ] `HUB_CONFIG` в `index.html`: `bot`, `policyUrl`, `offerUrl`, `orgName`
-- [ ] Три игры проходятся на телефоне свайпами, а не кнопками
-- [ ] В консоли браузера нет 404
-- [ ] Кнопка «уведомить о запуске» пишет событие `notify_subscribe`
-- [ ] В меню три игры, остальные четыре скрыты (`?all=1` покажет все)
-
-## Что намеренно не сделано
-
-Реклама, валюта, покупки, подписка, профили, админка. Фаза 0 — только метрики.
+Платежи, реклама, серверные лидерборды, профили, полноценная админка и realtime multiplayer. Сначала — безопасный измеряемый soft launch.
