@@ -39,12 +39,20 @@ const get = (path, headers = {}) => app.inject({ method: 'GET', url: path, heade
 const json = (r) => JSON.parse(r.body || '{}');
 const admin = { authorization: `Bearer ${ADMIN_TOKEN}` };
 
-let r = await post('/ev', { action: 'open_game', game: 'merge', value: 120 });
+let r = await post('/ev', { action: 'open_bot' });
+check('/ev принимает open_bot', r.statusCode === 200 && json(r).ok);
+r = await post('/ev', { action: 'return_visit', value: 1 });
+check('/ev принимает privacy-safe return signal', r.statusCode === 200 && json(r).ok);
+r = await post('/ev', { action: 'open_game', game: 'merge', value: 120 });
 check('/ev принимает анонимное событие', r.statusCode === 200 && json(r).ok);
 
 const signed555 = initData(555);
 r = await post('/ev', { action: 'finish', game: 'merge', value: 340, init_data: signed555 });
 check('/ev принимает валидированный MAX event', r.statusCode === 200, r.body);
+r = await post('/ev', { action: 'replay', game: 'merge', value: 340 });
+check('/ev принимает replay', r.statusCode === 200 && json(r).ok);
+r = await post('/ev', { action: 'share_ok', game: 'merge', value: 340 });
+check('/ev принимает share', r.statusCode === 200 && json(r).ok);
 
 r = await post('/ev', { action: 'finish', init_data: initData(555, { tamper: true }) });
 check('/ev отклоняет поддельный initData', r.statusCode === 401, `код ${r.statusCode}`);
@@ -72,6 +80,17 @@ r = await get('/stats');
 check('/stats закрыт без admin token', r.statusCode === 401, `код ${r.statusCode}`);
 const stats = json(await get('/stats', admin));
 check('/stats доступен администратору', typeof stats.open_game === 'number' && stats.open_game === 1, JSON.stringify(stats));
+check('funnel считает start/completion/replay/share',
+  stats.funnel?.start_rate_pct === 100 && stats.funnel?.completion_rate_pct === 100 && stats.funnel?.replay_rate_pct === 100 && stats.funnel?.share_rate_pct === 100,
+  JSON.stringify(stats.funnel));
+check('funnel считает возвратную сессию без cohort-идентификатора',
+  stats.funnel?.returning_sessions === 1 && stats.funnel?.next_day_return_events === 1 && stats.funnel?.returning_session_share_pct === 100,
+  JSON.stringify(stats.funnel));
+check('per-game funnel доступен',
+  stats.game_funnel?.merge?.starts === 1 && stats.game_funnel?.merge?.finishes === 1 && stats.game_funnel?.merge?.replays === 1 && stats.game_funnel?.merge?.shares === 1,
+  JSON.stringify(stats.game_funnel));
+const stats7 = json(await get('/stats?days=7', admin));
+check('/stats поддерживает окно days=1..90', stats7.window_days === 7 && stats7.funnel?.game_starts === 1, JSON.stringify(stats7));
 
 r = await get('/export.csv');
 check('/export.csv закрыт без admin token', r.statusCode === 401, `код ${r.statusCode}`);
