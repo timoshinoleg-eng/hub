@@ -12,6 +12,7 @@ process.env.HUB_JSON_DB = TMP_DB;
 process.env.HUB_HASH_SALT = 'smoke-hash-salt-0123456789abcdef0123456789abcdef';
 process.env.HUB_ADMIN_IDS = String(UID);
 process.env.HUB_NOTIFICATIONS_ENABLED = 'true';
+process.env.HUB_WEBAPP_URL = 'https://games.example.test/hub/';
 rmSync(TMP_DB, { force: true });
 
 const db = await import('../server/db.mjs');
@@ -93,6 +94,19 @@ for (const [label, msgs] of cases) {
 
 const results = [];
 const expect = (name, cond, detail = '') => results.push({ name, ok: !!cond, detail });
+const startButtons = cases[0][1]
+  .flatMap((message) => message.attachments)
+  .filter((attachment) => attachment?.type === 'inline_keyboard')
+  .flatMap((attachment) => attachment.payload?.buttons || [])
+  .flat();
+expect(
+  'стартовая клавиатура открывает Mini App',
+  startButtons.some((button) => button.type === 'open_app' && button.web_app === WEBAPP_URL)
+);
+expect(
+  'стартовая клавиатура не добавляет URL-кнопку',
+  !startButtons.some((button) => button.type === 'link' && button.url === WEBAPP_URL)
+);
 const subs = await db.listSubscribers();
 expect('подписчик записан', subs.length === 1 && Number(subs[0].user_id) === UID, `подписчиков: ${subs.length}`);
 const stats = await db.stats();

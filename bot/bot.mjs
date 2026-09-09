@@ -25,7 +25,6 @@ function mainKeyboard() {
   ];
   if (NOTIFICATIONS_ENABLED) rows.push([Keyboard.button.callback('🔔 Уведомить о запуске', 'notify')]);
   const links = [];
-  if (WEBAPP_URL) links.push(Keyboard.button.link('Открыть игротеку', WEBAPP_URL));
   for (const p of SISTER_PROJECTS.slice(0, 2)) links.push(Keyboard.button.link(p.title, p.url));
   if (links.length) rows.push(links.slice(0, 3));
   rows.push([Keyboard.button.callback('Правовая информация', 'legal')]);
