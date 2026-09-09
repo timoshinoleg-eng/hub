@@ -5,7 +5,7 @@ services:
       target: runtime
     image: hub-runtime:${HUB_RELEASE:?HUB_RELEASE is required}
     command: ["node", "server/index.mjs"]
-    env_file: ../.env
+    env_file: ../../.env
     restart: unless-stopped
     networks:
       quiz-battle:
@@ -20,7 +20,7 @@ services:
   bot:
     image: hub-runtime:${HUB_RELEASE:?HUB_RELEASE is required}
     command: ["node", "bot/index.mjs"]
-    env_file: ../.env
+    env_file: ../../.env
     restart: unless-stopped
     networks:
       quiz-battle:
