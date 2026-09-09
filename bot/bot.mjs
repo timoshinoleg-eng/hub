@@ -7,16 +7,18 @@ import { GAMES } from '../js/games.js';
 import * as db from '../server/db.mjs';
 
 const LIVE = GAMES.filter((g) => g.enabled);
+const WEB_APP_TARGET = BOT_USERNAME || WEBAPP_URL;
 
 // Fail closed: отсутствие HUB_ADMIN_IDS никого не делает администратором.
 const isAdmin = (uid) => ADMIN_IDS.length > 0 && ADMIN_IDS.includes(Number(uid));
 
-const openAppButton = (text) =>
-  WEBAPP_URL ? Keyboard.button.openApp(text, WEBAPP_URL) : Keyboard.button.openApp(text);
+const openAppButton = (text, payload) =>
+  WEB_APP_TARGET
+    ? Keyboard.button.openApp(text, WEB_APP_TARGET, undefined, payload)
+    : Keyboard.button.openApp(text);
 
 function playButton(g) {
-  if (BOT_USERNAME) return Keyboard.button.link(`${g.emoji} ${g.title}`, `https://max.ru/${BOT_USERNAME}?startapp=g${g.id}`);
-  return openAppButton(`${g.emoji} ${g.title}`);
+  return openAppButton(`${g.emoji} ${g.title}`, `g${g.id}`);
 }
 
 function mainKeyboard() {
