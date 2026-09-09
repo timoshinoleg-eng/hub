@@ -9,6 +9,12 @@ const get = (path) => {
 };
 const has = (path) => typeof get(path) === 'function';
 
+function readStartFromParams(raw) {
+  if (!raw) return '';
+  const params = new URLSearchParams(String(raw).replace(/^#/, ''));
+  return params.get('WebAppStartParam') || params.get('tgWebAppStartParam') || params.get('startapp') || params.get('start_param') || '';
+}
+
 export const bridge = {
   available: () => typeof window !== 'undefined' && !!window.WebApp,
 
@@ -20,10 +26,16 @@ export const bridge = {
 
   /** start_param влияет только на навигацию/UX, не даёт прав на backend. */
   startParam: () => {
-    const p = get('initDataUnsafe.start_param');
-    if (p) return String(p);
-    const q = new URLSearchParams(location.search).get('WebAppStartParam');
-    return q || '';
+    const unsafe = get('initDataUnsafe');
+    const direct = unsafe?.start_param || unsafe?.startParam || unsafe?.startapp;
+    if (direct) return String(direct);
+
+    const signed = readStartFromParams(get('initData'));
+    if (signed) return signed;
+
+    const query = readStartFromParams(typeof location !== 'undefined' ? location.search : '');
+    if (query) return query;
+    return readStartFromParams(typeof location !== 'undefined' ? location.hash : '');
   },
 
   ready: () => { if (has('ready')) get('ready')(); },
