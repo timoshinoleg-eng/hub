@@ -54,6 +54,8 @@ The corresponding Quizzzz work is developed in:
 
 It adds a configurable Vite base path. Unified builds use `VITE_BASE_PATH=/quiz/`; standalone Quizzzz keeps `/` as the default.
 
+The paired repository also owns the fail-closed staging package and the detailed `docs/UNIFIED_STAGING_ROLLOUT.md` runbook. Staging does not change the production MAX Mini App URL or webhook.
+
 ## Gateway requirements
 
 The gateway must route Hub static assets before the Quizzzz prefix and strip `/quiz` before proxying to a Quizzzz service that serves its SPA at `/`.
@@ -77,6 +79,8 @@ The gateway must route Hub static assets before the Quizzzz prefix and strip `/q
 Bot tokens and other secrets must never be written to Hub static files.
 
 Prefer an immutable Hub release directory such as `/opt/hub/releases/<git-sha>` and switch the active release only after smoke succeeds.
+
+`HUB_TRACK_ENDPOINT` is optional in phase 1. When it is absent, Hub gameplay events remain local and the UI suppresses the remote-notification subscription CTA instead of offering a flow that cannot succeed. A Hub analytics/subscription backend can be introduced separately after the unified product is stable.
 
 ## Rollback
 
