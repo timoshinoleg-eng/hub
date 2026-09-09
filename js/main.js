@@ -8,6 +8,7 @@ import { getGameProgress, getSummary, recordFinish } from './progress.js';
 import { GAMES, byId, visible } from './games.js';
 
 const CFG = window.HUB_CONFIG || {};
+const NOTIFICATIONS_ENABLED = CFG.notificationsEnabled === true;
 const SHOW_ALL = new URLSearchParams(location.search).has('all');
 const HUB_NAME = CFG.hubName || 'Игротека';
 const $ = (s) => document.querySelector(s);
@@ -192,7 +193,7 @@ function onMessage(e) {
 
 const NOTIFY_PROMPT_KEY = 'hub_notify_prompted_v1';
 function shouldOfferNotify(today) {
-  if (hasConsent() || getSummary(today).finishes < 3) return false;
+  if (!NOTIFICATIONS_ENABLED || hasConsent() || getSummary(today).finishes < 3) return false;
   try { return localStorage.getItem(NOTIFY_PROMPT_KEY) !== '1'; } catch { return false; }
 }
 function markNotifyPrompted() {

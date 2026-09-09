@@ -1,0 +1,29 @@
+# Add this block before the catch-all `handle` in the existing production Caddyfile.
+redir /hub /hub/ 308
+
+@hub_webhook path /hub/bot/webhook
+handle @hub_webhook {
+  request_body {
+    max_size 64KB
+  }
+  header -Server
+  reverse_proxy hub-bot:8788
+}
+
+handle_path /hub-api/* {
+  request_body {
+    max_size 32KB
+  }
+  header -Server
+  reverse_proxy hub-server:8787
+}
+
+handle_path /hub/* {
+  header {
+    -Server
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://st.max.ru; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://st.max.ru; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://*.max.ru https://web.max.ru"
+  }
+  reverse_proxy hub-static:8080
+}

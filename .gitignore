@@ -1,5 +1,6 @@
 # зависимости
 node_modules/
+.codegraph/
 
 # секреты
 .env

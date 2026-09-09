@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as db from '../server/db.mjs';
 import { createBot, commands } from './bot.mjs';
+import { botStartConfig } from './runtime.mjs';
 
 const TOKEN = process.env.BOT_TOKEN;
 if (!TOKEN) {
@@ -20,4 +21,4 @@ bot.catch((err, ctx) => {
 try { await bot.api.setMyCommands(commands); }
 catch (e) { console.error('Не удалось установить подсказки команд:', e?.message || e); }
 console.log('Бот запущен');
-await bot.start();
+await bot.start(botStartConfig());

@@ -1,0 +1,8 @@
+.git
+.codegraph
+node_modules
+.env
+server/data.json
+server/.smoke*.json
+*.log
+coverage

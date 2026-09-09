@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="css/hub.css">
 <link rel="stylesheet" href="css/polish.css">
 <script src="https://st.max.ru/js/max-web-app.js" defer></script>
+<script src="runtime-config.js"></script>
 <script>
   window.HUB_CONFIG = {
     bot: '',
@@ -15,6 +16,8 @@
     policyUrl: '',
     offerUrl: '',
     orgName: '',
+    notificationsEnabled: false,
+    ...window.HUB_CONFIG,
   };
   // window.HUB_TRACK_ENDPOINT = 'https://api.example.com/ev';
 </script>

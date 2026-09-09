@@ -52,9 +52,15 @@ HUB_ADMIN_IDS=<MAX user_id администраторов бота через з
 HUB_CORS_ORIGIN=https://games.example.ru
 HUB_WEBAPP_URL=https://games.example.ru
 HUB_BOT_USERNAME=id0000000000_bot
+HUB_BOT_WEBHOOK_DOMAIN=https://games.example.ru
+HUB_BOT_WEBHOOK_PORT=8788
+HUB_BOT_WEBHOOK_PATH=/hub/bot/webhook
+HUB_BOT_WEBHOOK_SECRET=<случайный секрет >= 32 символов>
 ```
 
 Production server откажется запускаться без Postgres, `BOT_TOKEN`, безопасного `HUB_ADMIN_TOKEN` и HTTPS-origin. `db.init()` отдельно откажется работать с отсутствующим/дефолтным/коротким `HUB_HASH_SALT`. Production bot также откажется использовать JSON storage.
+
+Production bot принимает события только через HTTPS webhook: режим long polling остаётся только для локальной разработки и не может очистить существующую production subscription. По умолчанию `HUB_NOTIFICATIONS_ENABLED=false`: кнопки подписки и endpoint `/sub` выключены. Для включения уведомлений обязательны реальные `HUB_ORG_NAME`, `HUB_ORG_INN`, `HUB_POLICY_URL`, `HUB_OFFER_URL` и `HUB_SUPPORT_EMAIL`; иначе production не стартует.
 
 ### Authentication contract
 

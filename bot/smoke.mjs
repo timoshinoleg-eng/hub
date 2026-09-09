@@ -11,6 +11,7 @@ const UID = 424242;
 process.env.HUB_JSON_DB = TMP_DB;
 process.env.HUB_HASH_SALT = 'smoke-hash-salt-0123456789abcdef0123456789abcdef';
 process.env.HUB_ADMIN_IDS = String(UID);
+process.env.HUB_NOTIFICATIONS_ENABLED = 'true';
 rmSync(TMP_DB, { force: true });
 
 const db = await import('../server/db.mjs');
