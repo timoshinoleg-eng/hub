@@ -1,16 +1,16 @@
-FROM node:22.23.0-alpine3.22 AS dependencies
+FROM node:22-alpine AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
-FROM node:22.23.0-alpine3.22 AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . ./
 USER node
 
-FROM nginx:1.28.1-alpine3.21 AS static
+FROM nginx:alpine AS static
 COPY deploy/nginx.conf /etc/nginx/nginx.conf
 COPY . /usr/share/nginx/html
 USER nginx
