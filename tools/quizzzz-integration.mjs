@@ -37,6 +37,8 @@ const index = read('index.html');
 const bootstrap = read('js/bootstrap.js');
 const bridge = read('js/bridge.js');
 const runtime = read('runtime-config.js');
+const track = read('js/track.js');
+const main = read('js/main.js');
 assert.ok(index.includes('<script src="runtime-config.js"></script>'), 'Hub loads deploy-time runtime config');
 assert.ok(index.includes('Object.assign({'), 'runtime config is merged over safe defaults');
 assert.ok(runtime.includes('window.HUB_CONFIG'), 'runtime config file has safe local defaults');
@@ -45,6 +47,8 @@ assert.ok(bootstrap.includes('routeQuizzzzLaunch()') && bootstrap.includes("impo
 for (const key of ['WebAppStartParam', 'tgWebAppStartParam', 'startapp', 'start_param']) {
   assert.ok(bridge.includes(key), `Hub bridge reads ${key} launch parameter form`);
 }
+assert.ok(track.includes('export const subscriptionAvailable'), 'Hub exposes subscription backend availability');
+assert.ok(main.includes('!subscriptionAvailable()'), 'notification CTA is suppressed when unified phase one has no Hub backend');
 
 const docs = read('QUIZZZZ_INTEGRATION.md');
 assert.ok(docs.includes('existing Quizzzz MAX bot remains the single production bot'), 'single bot ownership is documented');
@@ -52,4 +56,4 @@ assert.ok(docs.includes('Hub Node bot must be disabled'), 'legacy Hub bot is for
 assert.ok(docs.includes('/quiz/'), 'gateway mount is documented');
 assert.ok(docs.includes('feat/hub-integration'), 'paired Quizzzz branch is documented');
 
-console.log('Quizzzz integration contract v2: ok');
+console.log('Quizzzz integration contract v3: ok');
