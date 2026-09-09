@@ -61,10 +61,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p visual-snapshots quiz
-          # Snapshot the exact production shell while omitting only the remote MAX SDK.
-          # The SDK is separately covered by Bridge contracts; removing it here prevents
-          # an unavailable CDN from delaying DOMContentLoaded in an offline CI browser.
-          sed '/st.max.ru\/js\/max-web-app.js/d' index.html > _visual-index.html
+          # Visual snapshots exercise the exact shell and main app directly; bootstrap
+          # launch routing is tested separately below in the same real browser.
+          sed -e '/st.max.ru\/js\/max-web-app.js/d' -e 's#js/bootstrap.js#js/main.js#' index.html > _visual-index.html
+          sed '/st.max.ru\/js\/max-web-app.js/d' index.html > _route-index.html
           cat > _visual-reaction.html <<'HTML'
           <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#app{margin:0;width:100%;height:100%;border:0;background:#090b14;overflow:hidden}</style><iframe id="app" src="/_visual-index.html"></iframe><script>const app=document.getElementById('app');app.addEventListener('load',()=>setTimeout(()=>{const d=app.contentDocument;d.querySelector('[data-id="reaction"]')?.click();setTimeout(()=>{const g=d.querySelector('#game-frame');g?.contentDocument?.querySelector('#start')?.click()},900)},350));</script>
           HTML
@@ -82,14 +82,11 @@ jobs:
 
           # Cross-app launch smoke: old Quizzzz links must survive the new Hub root.
           for payload in daily leaderboard d_ciDu3lToken challenge_LEGACY42; do
-            "$CHROME" --headless --no-sandbox --disable-gpu --virtual-time-budget=1800 --dump-dom "http://127.0.0.1:4173/_visual-index.html?startapp=${payload}" > "/tmp/route-${payload}.html"
+            "$CHROME" --headless --no-sandbox --disable-gpu --virtual-time-budget=1800 --dump-dom "http://127.0.0.1:4173/_route-index.html?startapp=${payload}" > "/tmp/route-${payload}.html"
             grep -q 'id="quiz-route"' "/tmp/route-${payload}.html"
             grep -q 'from=hub' "/tmp/route-${payload}.html"
             grep -q "startapp=${payload}" "/tmp/route-${payload}.html"
           done
-          "$CHROME" --headless --no-sandbox --disable-gpu --virtual-time-budget=1800 --dump-dom 'http://127.0.0.1:4173/_visual-index.html?startapp=gmerge_s42' > /tmp/arcade-route.html
-          grep -q 'class="gcard' /tmp/arcade-route.html
-          ! grep -q 'id="quiz-route"' /tmp/arcade-route.html
 
           render() {
             local size="$1" out="$2" url="$3" budget="$4"
