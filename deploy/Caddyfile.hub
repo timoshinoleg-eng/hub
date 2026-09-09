@@ -1,4 +1,7 @@
 # Add this block before the catch-all `handle` in the existing production Caddyfile.
+# The permanent MAX Mini App card previously opened the legacy root URL. Keep the
+# existing bot identity and send that launch directly to the Hub.
+redir / /hub/ 308
 redir /hub /hub/ 308
 
 @hub_webhook path /hub/bot/webhook
