@@ -25,5 +25,3 @@ export function routeQuizzzzLaunch() {
   window.location.replace(target);
   return true;
 }
-
-routeQuizzzzLaunch();
