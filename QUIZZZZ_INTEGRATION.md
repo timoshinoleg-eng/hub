@@ -26,6 +26,26 @@ The existing Quizzzz MAX bot remains the single production bot/webhook owner. Th
 
 The existing Quizzzz bot Mini App URL is changed to the unified Hub root only after staging smoke passes.
 
+If Telegram is enabled, it must use its own `TELEGRAM_MINI_APP_URL` pointing to Quizzzz (`/quiz/` or the existing standalone Quizzzz URL). Telegram must not inherit the MAX Hub root by accident.
+
+## Legacy Quizzzz launch intents
+
+Once the existing MAX bot points to Hub, historical Quizzzz deep links also arrive at `/`. Hub therefore routes the established Quizzzz namespace before `main.js` boots:
+
+- `daily`
+- `league` / `leaderboard`
+- `challenge_new`
+- `d_<opaque duel token>`
+- `challenge_<legacy code>`
+
+The compatibility router preserves the original payload and redirects to:
+
+```text
+/quiz/?from=hub&startapp=<payload>
+```
+
+Arcade deep links keep their separate `g<game>[_s<score>]` format and stay in Hub.
+
 ## Paired Quizzzz branch
 
 The corresponding Quizzzz work is developed in:
@@ -46,8 +66,17 @@ The gateway must route Hub static assets before the Quizzzz prefix and strip `/q
 /assets/icons.svg  -> Hub
 /quiz/*            -> Quizzzz frontend (strip /quiz upstream)
 /api/v1/*          -> Quizzzz FastAPI
+/share/*           -> Quizzzz share pages
 /webhooks/max      -> Quizzzz FastAPI/MAX webhook
 ```
+
+## Runtime configuration
+
+`runtime-config.js` is deployment-owned public metadata. The paired Quizzzz unified compose stack runs a one-shot `hub-config` service before Caddy starts; it writes the bot username and other public Hub settings into the exact `HUB_ROOT` release directory.
+
+Bot tokens and other secrets must never be written to Hub static files.
+
+Prefer an immutable Hub release directory such as `/opt/hub/releases/<git-sha>` and switch the active release only after smoke succeeds.
 
 ## Rollback
 
