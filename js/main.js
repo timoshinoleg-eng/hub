@@ -8,9 +8,9 @@ import { getGameProgress, getSummary, recordFinish } from './progress.js';
 import { challengeIntroText,challengeResultState,dailyHeroState,dailyResultText,recordBadgeText } from './ui-state.js';
 import { GAMES, byId, visible } from './games.js';
 const CFG=window.HUB_CONFIG||{},SHOW_ALL=new URLSearchParams(location.search).has('all'),HUB_NAME=CFG.hubName||'Игротека',$=(s)=>document.querySelector(s);const el=(tag,cls,html)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(html!=null)n.innerHTML=html;return n};const state={game:null,score:null,challenge:null,finishMeta:null};window.__hubStartParam=bridge.startParam();
-function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]))}
+function esc(s){return String(s??'').replace(/[&<>"']/g,(c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function iconSvg(id,cls='game-icon'){const safe=/^[a-z-]+$/.test(String(id||''))?id:'brand';return `<svg class="${cls}" aria-hidden="true"><use href="assets/icons.svg#${safe}"></use></svg>`}
-function mascotSvg(stateName='idle',cls='mascot-icon'){const safe=['idle','happy','wow','challenge','fail'].includes(stateName)?stateName:'idle';return iconSvg(`mascot-${safe}`,cls)}function sceneSvg(id,cls='scene-icon'){const safe=/^[a-z]+$/.test(g?.hint||'')?g.hint:'tap';return iconSvg(`scene-${safe}`,cls)}
+function mascotSvg(stateName='idle',cls='mascot-icon'){const safe=['idle','happy','wow','challenge','fail'].includes(stateName)?stateName:'idle';return iconSvg(`mascot-${safe}`,cls)}function sceneSvg(id,cls='scene-icon'){const safe=/^[a-z]+$/.test(String(id||''))?id:'merge';return iconSvg(`scene-${safe}`,cls)}
 function formatBest(g,best){return best==null?'Рекорда ещё нет':`Рекорд ${best}${g.unit?' '+g.unit:''}`}function deepLink(gameId,score){const bot=CFG.bot;if(!bot)return'';const p=score==null?`g${gameId}`:`g${gameId}_s${score}`;return `https://max.ru/${bot}?startapp=${p}`}
 function parseStartParam(sp){const m=/^g([a-z]+)(?:_s(\d+))?$/i.exec(sp||'');if(!m)return null;const game=byId(m[1].toLowerCase());return game?{game,challenge:m[2]?Number(m[2]):null}:null}
 function dailyGameForDate(date){const pool=GAMES.filter((g)=>g.enabled&&g.cfg?.daily);if(!pool.length)return null;const n=[...date].reduce((a,c)=>a+c.charCodeAt(0),0);return pool[n%pool.length]}
