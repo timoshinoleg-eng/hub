@@ -1,4 +1,4 @@
-import { bridge } from './bridge.js';
+import { bridge } from './bridge.js?v=20260910-1';
 import { track, hasConsent, setConsent, subscribe } from './track.js';
 import { cardDataUrl, shareText } from './share.js';
 import { duelResult } from './duel.js';
@@ -341,4 +341,5 @@ function init() {
   }
   if (!CFG.bot) console.warn('[hub] HUB_CONFIG.bot не задан — deep link в шаринге работать не будет');
 }
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
