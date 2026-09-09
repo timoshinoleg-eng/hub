@@ -6,6 +6,10 @@ services:
     image: hub-runtime:${HUB_RELEASE:?HUB_RELEASE is required}
     command: ["node", "server/index.mjs"]
     env_file: ../../.env
+    environment:
+      NODE_EXTRA_CA_CERTS: /app/certs/extra-ca.crt
+    volumes:
+      - ${HUB_EXTRA_CA_CERT:?HUB_EXTRA_CA_CERT is required}:/app/certs/extra-ca.crt:ro
     restart: unless-stopped
     networks:
       quiz-battle:
@@ -21,6 +25,10 @@ services:
     image: hub-runtime:${HUB_RELEASE:?HUB_RELEASE is required}
     command: ["node", "bot/index.mjs"]
     env_file: ../../.env
+    environment:
+      NODE_EXTRA_CA_CERTS: /app/certs/extra-ca.crt
+    volumes:
+      - ${HUB_EXTRA_CA_CERT:?HUB_EXTRA_CA_CERT is required}:/app/certs/extra-ca.crt:ro
     restart: unless-stopped
     networks:
       quiz-battle:
