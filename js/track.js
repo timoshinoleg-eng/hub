@@ -21,6 +21,8 @@ export const hasConsent = () => {
 export const setConsent = () => {
   try { localStorage.setItem(CONSENT_KEY, '1'); } catch { /* ignore */ }
 };
+/** Whether this deployment has a usable Hub subscription backend. */
+export const subscriptionAvailable = () => Boolean(ENDPOINT);
 
 function initData() {
   const raw = window.WebApp?.initData;

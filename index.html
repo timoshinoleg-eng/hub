@@ -8,15 +8,15 @@
 <link rel="stylesheet" href="css/hub.css">
 <link rel="stylesheet" href="css/polish.css">
 <script src="https://st.max.ru/js/max-web-app.js" defer></script>
+<script src="runtime-config.js"></script>
 <script>
-  window.HUB_CONFIG = {
+  window.HUB_CONFIG = Object.assign({
     bot: '',
     hubName: 'Игротека',
     policyUrl: '',
     offerUrl: '',
     orgName: '',
-  };
-  // window.HUB_TRACK_ENDPOINT = 'https://api.example.com/ev';
+  }, window.HUB_CONFIG || {});
 </script>
 </head>
 <body data-view="menu">
@@ -68,6 +68,6 @@
 </div>
 
 <div id="overlay"></div>
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/bootstrap.js"></script>
 </body>
 </html>
