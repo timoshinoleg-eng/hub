@@ -24,10 +24,14 @@ jobs:
         run: npm run smoke:product
       - name: Quizzzz integration contract
         run: npm run smoke:quizzzz
+      - name: Full Quizzzz feature-parity contract
+        run: npm run smoke:quizzzz-parity
       - name: UI state contract
         run: npm run smoke:ui-state
       - name: Iframe bridge contract
         run: npm run smoke:bridge
+      - name: MAX cached-shell recovery
+        run: npm run smoke:cache-recovery
       - name: Analytics transport and privacy
         run: npm run smoke:track
       - name: MAX initData authentication
@@ -44,6 +48,12 @@ jobs:
         run: npm run smoke:server
       - name: Bot contracts
         run: npm run smoke:bot
+      - name: Production bot runtime contract
+        run: node tools/bot-runtime.mjs
+      - name: Notification safety contract
+        run: node tools/notifications.mjs
+      - name: Production compose and static-cache contract
+        run: node tools/production-compose.mjs
       - name: Daily determinism
         run: npm run smoke:daily
       - name: Duel logic
