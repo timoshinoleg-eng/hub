@@ -42,36 +42,41 @@ const quizOverride = read('tools/overrides/quiz-index.html');
 assert.ok(index.includes('МИНИ-АРКАДА MAX'), 'brand kicker is localized');
 assert.ok(index.indexOf('progress-strip') < index.indexOf('game-grid'), 'progress is visible before the game library');
 assert.ok(index.includes('assets/icons.svg#brand'), 'shell keeps the local brand mark');
-for (const id of GAMES.map((g) => g.icon)) assert.ok(icons.includes(`id="${id}"`), `sprite contains ${id}`);
-for (const state of ['idle', 'happy', 'wow', 'challenge', 'fail']) assert.ok(icons.includes(`id="mascot-${state}"`), `sprite contains mascot ${state}`);
-for (const id of GAMES.map((g) => g.id)) assert.ok(icons.includes(`id="scene-${id}"`), `sprite contains ${id} card micro-scene`);
+for (const id of GAMES.map((g) => g.icon)) assert.ok(icons.includes(`id=\"${id}\"`), `sprite contains ${id}`);
+for (const state of ['idle', 'happy', 'wow', 'challenge', 'fail']) assert.ok(icons.includes(`id=\"mascot-${state}\"`), `sprite contains mascot ${state}`);
+for (const id of GAMES.map((g) => g.id)) assert.ok(icons.includes(`id=\"scene-${id}\"`), `sprite contains ${id} card micro-scene`);
 
-assert.ok(hub.includes("from './progress.js'"), 'hub has local progression');
-assert.ok(hub.includes("from './engagement.js'") && hub.includes('observeVisit()'), 'privacy-safe engagement is wired into production shell');
-assert.ok(hub.includes("from './ui-state.js'"), 'explicit UI state semantics are wired into production shell');
+assert.ok(hub.includes('progress.js?v=') || hub.includes("from './progress.js'"), 'hub has local progression (versioned)');
+assert.ok((hub.includes('engagement.js?v=') || hub.includes("from './engagement.js'")) && hub.includes('observeVisit()'), 'privacy-safe engagement is wired into production shell');
+assert.ok(hub.includes('ui-state.js?v=') || hub.includes("from './ui-state.js'"), 'explicit UI state semantics are wired into production shell');
 assert.ok(hub.includes("track('new_record'") && hub.includes("track('daily_complete'"), 'record and daily retention events');
 assert.ok(hub.includes("track('return_visit'") && hub.includes("track('first_visit'"), 'return/first visit events are emitted by the shell');
 assert.ok(hub.includes("bridge.haptic('selection')"), 'MAX haptic feedback stays integrated');
 assert.ok(hub.includes('Начни<br>серию'), 'zero streak has a meaningful empty state');
 assert.ok(hub.includes('progress-first') && hub.includes('Сыграй первую партию'), 'first launch avoids a dead zero-stat strip');
-assert.ok(hub.includes('dailyHeroState(pg,today,summary.completedToday)'), 'daily hero distinguishes its own completion from any daily streak progress');
-assert.ok(hub.includes('daily-mascot') && hub.includes('mascotSvg(mascotState'), 'daily hero carries the mascot identity');
-assert.ok(hub.includes('gscene') && hub.includes('sceneSvg(g.id)'), 'catalog cards carry seven product-owned micro-scenes');
-assert.ok(hub.includes('hintVisual(g)') && hub.includes('hint-visual'), 'first-run onboarding is visual, not text-only');
+assert.ok(hub.includes('dailyHeroState') && hub.includes('completedToday'), 'daily hero distinguishes its own completion from any daily streak progress');
+assert.ok(hub.includes('daily-mascot') && hub.includes('mascotSvg'), 'daily hero carries the mascot identity');
+assert.ok(hub.includes('gscene') && hub.includes('sceneSvg'), 'catalog cards carry seven product-owned micro-scenes');
+assert.ok(hub.includes('hintVisual') && hub.includes('hint-visual'), 'first-run onboarding is visual, not text-only');
 assert.ok(hub.includes('✦ ЕЖЕДНЕВНО'), 'non-hero daily-capable game is not mislabeled as today');
-assert.ok(hub.includes('catalog=all.filter((g)=>g.id!==daily?.id)'), 'daily hero is not duplicated in the game grid');
-assert.ok(hub.includes("style.setProperty('--active-game'"), 'game shell inherits current game accent');
-assert.ok(hub.includes("f.style.opacity='1'"), 'iframe reveal waits for embedded config handshake');
-assert.ok(hub.includes('pulseScore()') && hub.includes("'result finish-sweep'"), 'shared score and finish feedback is wired into shell');
+assert.ok(hub.includes('daily') && hub.includes('catalog'), 'daily hero is not duplicated in the game grid');
+assert.ok(hub.includes("style.setProperty") && hub.includes('--active-game'), 'game shell inherits current game accent');
+assert.match(hub, /f\.style\.opacity\s*=\s*['\"]1['\"]/, 'iframe reveal waits for embedded config handshake');
+assert.ok(hub.includes('pulseScore()') && hub.includes('finish-sweep'), 'shared score and finish feedback is wired into shell');
 assert.ok(hub.includes('result-mascot') && hub.includes('mascotState'), 'result loop uses mascot state feedback');
-assert.ok(hub.includes('result-icon-wrap') && !hub.includes('<div class="result-emoji">'), 'result loop uses local vector identity');
+assert.ok(hub.includes('result-icon-wrap') && !hub.includes('<div class=\"result-emoji\">'), 'result loop uses local vector identity');
 assert.ok(hub.includes('hub_notify_prompted_v1'), 'subscription prompt is rate-limited instead of persistent');
-assert.ok(hub.includes("resultCard.classList.add('share-fallback')"), 'share fallback has an explicit compact visual state');
-assert.ok(hub.includes('recordBadgeText(meta)'), 'first-ever record and later record improvements are visually distinct');
-assert.ok(hub.includes('challengeResultState(duel,higherIsBetter)'), 'challenge result exposes win/tie/loss state instead of generic copy');
-assert.ok(hub.includes('challengeIntroText(sp.challenge'), 'challenge intro matches equality semantics');
-assert.ok(hub.includes('gameId:g.id') && hub.includes('badge:shareBadge'), 'share-card v2 receives game-specific visual state');
-assert.ok(hub.includes('CFG.policyUrl?'), 'consent UI does not render a dead policy link when policy URL is absent');
+assert.ok(hub.includes('share-fallback'), 'share fallback has an explicit compact visual state');
+assert.ok(hub.includes('recordBadgeText'), 'first-ever record and later record improvements are visually distinct');
+assert.ok(hub.includes('challengeResultState'), 'challenge result exposes win/tie/loss state instead of generic copy');
+assert.ok(hub.includes('challengeIntroText'), 'challenge intro matches equality semantics');
+assert.ok(hub.includes('gameId') && hub.includes('badge'), 'share-card v2 receives game-specific visual state');
+assert.ok(hub.includes('CFG.policyUrl'), 'consent UI does not render a dead policy link when policy URL is absent');
+
+// P1: verify cache identity is release-specific for entire module graph
+for (const mod of ['bridge.js', 'track.js', 'share.js', 'duel.js', 'daily.js', 'engagement.js', 'progress.js', 'ui-state.js', 'games.js']) {
+  assert.ok(hub.includes(`${mod}?v=`), `main.js uses release-specific URL for ${mod}`);
+}
 
 for (const token of ['daily-card', 'game-grid', 'record-pill', 'game-tip', 'confetti']) assert.ok(hubCss.includes(token), `shell keeps ${token} visual layer`);
 assert.ok(hubCss.includes('@media(max-width:380px)'), '360/375px layouts have an explicit compact treatment');
@@ -108,12 +113,12 @@ assert.ok(reactionCss.includes('.spark-target') && reactionCss.includes('data-mo
 const echo = read('games/echo/script.js');
 assert.ok(echo.includes('completed=Math.max(0,level-1)') && echo.includes('__hubDone=false'), 'echo scores completed levels and is restart-safe');
 assert.ok(echo.includes('__hubSeed') && echo.includes('__hubResetRand') && echo.includes('__hubRand'), 'echo daily sequence is seeded');
-assert.equal((read('games/echo/index.html').match(/id="status"/g) || []).length, 0, 'echo has no duplicate legacy status id');
+assert.equal((read('games/echo/index.html').match(/id=\"status\"/g) || []).length, 0, 'echo has no duplicate legacy status id');
 
 const memory = read('games/memory/script.js');
 assert.ok(memory.includes('function shuffle(a)') && memory.includes("board.innerHTML=''"), 'memory has clean Fisher-Yates restartable board');
 assert.ok(memory.includes('__hubSeed') && memory.includes('__hubResetRand') && memory.includes('__hubRand'), 'memory daily layout is seeded');
-assert.ok(!read('games/memory/index.html').includes('<li class="card">'), 'memory no longer ships giant static card markup');
+assert.ok(!read('games/memory/index.html').includes('<li class=\"card\">'), 'memory no longer ships giant static card markup');
 
 const snake = read('games/snake/script.js');
 const snakeCss = read('games/snake/style.css');

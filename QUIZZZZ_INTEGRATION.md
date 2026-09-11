@@ -72,6 +72,20 @@ The gateway must route Hub static assets before the Quizzzz prefix and strip `/q
 /webhooks/max      -> Quizzzz FastAPI/MAX webhook
 ```
 
+### FastAPI docs surface decision (explicit)
+
+Historical standalone Caddy proxied unmatched routes to FastAPI, so FastAPI defaults `/docs`, `/redoc`, `/openapi.json` were publicly reachable.
+
+Unified gateway explicitly enumerates Quizzzz backend ownership for `/api/*`, `/share/*`, `/health`, `/ready`, `/webhooks/max`, `/telegram/webhook` and sends everything else to Hub SPA. Therefore FastAPI docs change their public behavior.
+
+**Decision (production minimal surface):** FastAPI docs are considered internal/non-public and must be disabled in production. The gateway must NOT expose `/docs`, `/redoc`, `/openapi.json` to public internet. Production FastAPI should be instantiated with `docs_url=None, redoc_url=None, openapi_url=None` or equivalent, and gateway must not route those paths to backend.
+
+Rationale: minimal public surface, avoids exposing internal schema, aligns with existing production hardening (no public introspection). For local development, docs may remain enabled via ENV=development.
+
+This decision is locked by `tools/gateway-docs.mjs` and by Quizzzz-side contract `tests/test_gateway_docs.py` (or equivalent) plus documentation in `docs/UNIFIED_STAGING_ROLLOUT.md`.
+
+If operational needs change to require public docs, the decision must be revisited explicitly with security review and gateway allowlist update, not by accidental Caddy catch-all.
+
 ## Runtime configuration
 
 `runtime-config.js` is deployment-owned public metadata. The paired Quizzzz unified compose stack runs a one-shot `hub-config` service before Caddy starts; it writes the bot username and other public Hub settings into the exact `HUB_ROOT` release directory.

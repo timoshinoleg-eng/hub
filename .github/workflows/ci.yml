@@ -52,6 +52,12 @@ jobs:
         run: node tools/bot-runtime.mjs
       - name: Notification safety contract
         run: node tools/notifications.mjs
+      - name: Notification gating client contract
+        run: node tools/notification-gating.mjs
+      - name: FastAPI docs surface decision contract
+        run: node tools/gateway-docs.mjs
+      - name: Production renderer preflight contract
+        run: node tools/production-renderer-preflight.mjs
       - name: Production compose and static-cache contract
         run: node tools/production-compose.mjs
       - name: Daily determinism
