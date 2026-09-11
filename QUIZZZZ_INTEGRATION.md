@@ -70,19 +70,22 @@ The gateway must route Hub static assets before the Quizzzz prefix and strip `/q
 /api/v1/*          -> Quizzzz FastAPI
 /share/*           -> Quizzzz share pages
 /webhooks/max      -> Quizzzz FastAPI/MAX webhook
+/docs              -> 404 in unified production
+/redoc             -> 404 in unified production
+/openapi.json      -> 404 in unified production
 ```
 
 ### FastAPI docs surface decision (explicit)
 
 Historical standalone Caddy proxied unmatched routes to FastAPI, so FastAPI defaults `/docs`, `/redoc`, `/openapi.json` were publicly reachable.
 
-Unified gateway explicitly enumerates Quizzzz backend ownership for `/api/*`, `/share/*`, `/health`, `/ready`, `/webhooks/max`, `/telegram/webhook` and sends everything else to Hub SPA. Therefore FastAPI docs change their public behavior.
+Unified gateway explicitly enumerates Quizzzz backend ownership for `/api/*`, `/share/*`, `/health`, `/ready`, `/webhooks/max`, `/telegram/webhook` and sends the normal application surface to Hub SPA.
 
-**Decision (production minimal surface):** FastAPI docs are considered internal/non-public and must be disabled in production. The gateway must NOT expose `/docs`, `/redoc`, `/openapi.json` to public internet. Production FastAPI should be instantiated with `docs_url=None, redoc_url=None, openapi_url=None` or equivalent, and gateway must not route those paths to backend.
+**Decision (production minimal surface):** FastAPI docs are internal/non-public on the unified origin. The paired Quizzzz `deploy/Caddyfile.hub` explicitly matches `/docs`, `/redoc`, `/openapi.json` before the Hub fallback and returns HTTP 404, so these paths cannot accidentally expose FastAPI schema or masquerade as Hub SPA routes. FastAPI may keep its default docs internally for local/service-level diagnostics; the public unified gateway does not expose them.
 
-Rationale: minimal public surface, avoids exposing internal schema, aligns with existing production hardening (no public introspection). For local development, docs may remain enabled via ENV=development.
+Rationale: minimal public surface, avoids exposing internal schema, preserves local debugging capability, and makes the behavioral change explicit instead of depending on catch-all ordering.
 
-This decision is locked by `tools/gateway-docs.mjs` and by Quizzzz-side contract `tests/test_gateway_docs.py` (or equivalent) plus documentation in `docs/UNIFIED_STAGING_ROLLOUT.md`.
+This decision is locked by `tools/gateway-docs.mjs` here and by Quizzzz-side `tests/test_gateway_docs_contract.py` plus `docs/HUB_INTEGRATION.md`.
 
 If operational needs change to require public docs, the decision must be revisited explicitly with security review and gateway allowlist update, not by accidental Caddy catch-all.
 
