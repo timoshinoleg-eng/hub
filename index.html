@@ -11,16 +11,14 @@
 <script>window.__HUB_DYNAMIC_BOOT__ = true;</script>
 <script src="runtime-config.js"></script>
 <script>
-  window.HUB_CONFIG = {
+  window.HUB_CONFIG = Object.assign({
     bot: '',
     hubName: 'Игротека',
     policyUrl: '',
     offerUrl: '',
     orgName: '',
     notificationsEnabled: false,
-    ...window.HUB_CONFIG,
-  };
-  // window.HUB_TRACK_ENDPOINT = 'https://api.example.com/ev';
+  }, window.HUB_CONFIG || {});
 </script>
 </head>
 <body data-view="menu">
@@ -75,7 +73,7 @@
 <script>
   const script = document.createElement('script');
   script.type = 'module';
-  script.src = 'js/main.js?v=' + encodeURIComponent(window.HUB_ASSET_REVISION || '20260910-1');
+  script.src = 'js/bootstrap.js?v=' + encodeURIComponent(window.HUB_ASSET_REVISION || '20260911-rc1');
   document.body.appendChild(script);
 </script>
 </body>

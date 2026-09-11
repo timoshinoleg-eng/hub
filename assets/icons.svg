@@ -4,52 +4,48 @@
     <circle cx="38" cy="9" r="3" fill="currentColor" opacity=".62"/>
     <circle cx="9" cy="36" r="2.5" fill="currentColor" opacity=".42"/>
   </symbol>
-  <symbol id="merge" viewBox="0 0 48 48">
-    <g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="7" y="7" width="13" height="13" rx="4"/>
-      <rect x="28" y="7" width="13" height="13" rx="4"/>
-      <rect x="17.5" y="28" width="13" height="13" rx="4"/>
-      <path d="M13.5 24v3.5h21V24M24 27.5V24"/>
-    </g>
+  <symbol id="mascot-idle" viewBox="0 0 48 48">
+    <path d="M24 4c5.4 0 7.7 5.5 9.6 10.4C38.5 16.3 44 18.6 44 24s-5.5 7.7-10.4 9.6C31.7 38.5 29.4 44 24 44s-7.7-5.5-9.6-10.4C9.5 31.7 4 29.4 4 24s5.5-7.7 10.4-9.6C16.3 9.5 18.6 4 24 4Z" fill="currentColor"/>
+    <circle cx="18.5" cy="22" r="2.1" fill="#111526"/><circle cx="29.5" cy="22" r="2.1" fill="#111526"/>
+    <path d="M19 29c3.2 2.3 6.8 2.3 10 0" fill="none" stroke="#111526" stroke-width="2.1" stroke-linecap="round"/>
+    <circle cx="39" cy="10" r="2.2" fill="currentColor" opacity=".55"/>
   </symbol>
-  <symbol id="reaction" viewBox="0 0 48 48">
-    <g fill="none" stroke="currentColor" stroke-width="3.3" stroke-linecap="round">
-      <circle cx="24" cy="24" r="14"/>
-      <circle cx="24" cy="24" r="6"/>
-      <path d="M24 4v8M24 36v8M4 24h8M36 24h8"/>
-    </g>
-    <circle cx="24" cy="24" r="2.5" fill="currentColor"/>
+  <symbol id="mascot-happy" viewBox="0 0 48 48">
+    <path d="M24 4c5.4 0 7.7 5.5 9.6 10.4C38.5 16.3 44 18.6 44 24s-5.5 7.7-10.4 9.6C31.7 38.5 29.4 44 24 44s-7.7-5.5-9.6-10.4C9.5 31.7 4 29.4 4 24s5.5-7.7 10.4-9.6C16.3 9.5 18.6 4 24 4Z" fill="currentColor"/>
+    <path d="M15.5 21c1.7-2.1 4.3-2.1 6 0M26.5 21c1.7-2.1 4.3-2.1 6 0" fill="none" stroke="#111526" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M18 28c3.6 5 8.4 5 12 0" fill="#fff" stroke="#111526" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M39 7l1.4 3.6L44 12l-3.6 1.4L39 17l-1.4-3.6L34 12l3.6-1.4L39 7Z" fill="currentColor" opacity=".72"/>
   </symbol>
-  <symbol id="snake" viewBox="0 0 48 48">
-    <path d="M10 12c0-4 3-6 7-6h10c5 0 8 3 8 7s-3 7-8 7H20c-5 0-8 3-8 8s3 8 8 8h9" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"/>
-    <circle cx="34" cy="36" r="5" fill="currentColor"/>
-    <circle cx="35.5" cy="34.5" r="1" fill="#090b14"/>
+  <symbol id="mascot-wow" viewBox="0 0 48 48">
+    <path d="M24 4c5.4 0 7.7 5.5 9.6 10.4C38.5 16.3 44 18.6 44 24s-5.5 7.7-10.4 9.6C31.7 38.5 29.4 44 24 44s-7.7-5.5-9.6-10.4C9.5 31.7 4 29.4 4 24s5.5-7.7 10.4-9.6C16.3 9.5 18.6 4 24 4Z" fill="currentColor"/>
+    <circle cx="18.5" cy="21" r="2.6" fill="#111526"/><circle cx="29.5" cy="21" r="2.6" fill="#111526"/>
+    <circle cx="24" cy="30" r="3.6" fill="#111526"/><circle cx="39" cy="10" r="2.2" fill="currentColor" opacity=".55"/>
   </symbol>
-  <symbol id="sapper" viewBox="0 0 48 48">
-    <g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round">
-      <circle cx="24" cy="24" r="10"/>
-      <path d="M24 5v7M24 36v7M5 24h7M36 24h7M10.5 10.5l5 5M32.5 32.5l5 5M37.5 10.5l-5 5M15.5 32.5l-5 5"/>
-    </g>
-    <circle cx="21" cy="21" r="2" fill="currentColor"/>
-    <circle cx="28" cy="27" r="1.8" fill="currentColor" opacity=".72"/>
+  <symbol id="mascot-challenge" viewBox="0 0 48 48">
+    <path d="M24 4c5.4 0 7.7 5.5 9.6 10.4C38.5 16.3 44 18.6 44 24s-5.5 7.7-10.4 9.6C31.7 38.5 29.4 44 24 44s-7.7-5.5-9.6-10.4C9.5 31.7 4 29.4 4 24s5.5-7.7 10.4-9.6C16.3 9.5 18.6 4 24 4Z" fill="currentColor"/>
+    <path d="M15.5 18.5l6 1M32.5 18.5l-6 1" stroke="#111526" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="19" cy="23" r="2" fill="#111526"/><circle cx="29" cy="23" r="2" fill="#111526"/>
+    <path d="M19 30h10" stroke="#111526" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M39 7l1.4 3.6L44 12l-3.6 1.4L39 17l-1.4-3.6L34 12l3.6-1.4L39 7Z" fill="currentColor" opacity=".7"/>
   </symbol>
-  <symbol id="quiz" viewBox="0 0 48 48">
-    <path d="M10 9h28a5 5 0 0 1 5 5v17a5 5 0 0 1-5 5H24l-9 7v-7h-5a5 5 0 0 1-5-5V14a5 5 0 0 1 5-5Z" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/>
-    <path d="M19 19c.8-4 9.8-5 10 1 .1 3.8-5 4-5 8" fill="none" stroke="currentColor" stroke-width="3.3" stroke-linecap="round"/>
-    <circle cx="24" cy="32" r="2" fill="currentColor"/>
+  <symbol id="mascot-fail" viewBox="0 0 48 48">
+    <path d="M24 4c5.4 0 7.7 5.5 9.6 10.4C38.5 16.3 44 18.6 44 24s-5.5 7.7-10.4 9.6C31.7 38.5 29.4 44 24 44s-7.7-5.5-9.6-10.4C9.5 31.7 4 29.4 4 24s5.5-7.7 10.4-9.6C16.3 9.5 18.6 4 24 4Z" fill="currentColor"/>
+    <path d="M16.5 21l4-2M31.5 21l-4-2" stroke="#111526" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="19" cy="23" r="1.9" fill="#111526"/><circle cx="29" cy="23" r="1.9" fill="#111526"/>
+    <path d="M19 32c3-3 7-3 10 0" fill="none" stroke="#111526" stroke-width="2.1" stroke-linecap="round"/>
   </symbol>
-  <symbol id="echo" viewBox="0 0 48 48">
-    <circle cx="24" cy="24" r="4" fill="currentColor"/>
-    <g fill="none" stroke="currentColor" stroke-width="3.1" stroke-linecap="round">
-      <path d="M17 17a10 10 0 0 0 0 14M31 17a10 10 0 0 1 0 14"/>
-      <path d="M11.5 11.5a18 18 0 0 0 0 25M36.5 11.5a18 18 0 0 1 0 25"/>
-    </g>
-  </symbol>
-  <symbol id="memory" viewBox="0 0 48 48">
-    <g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round">
-      <rect x="8" y="11" width="23" height="29" rx="5"/>
-      <rect x="17" y="7" width="23" height="29" rx="5"/>
-      <path d="M25 17h7M25 23h7"/>
-    </g>
-  </symbol>
+  <symbol id="merge" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="13" height="13" rx="4"/><rect x="28" y="7" width="13" height="13" rx="4"/><rect x="17.5" y="28" width="13" height="13" rx="4"/><path d="M13.5 24v3.5h21V24M24 27.5V24"/></g></symbol>
+  <symbol id="reaction" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.3" stroke-linecap="round"><circle cx="24" cy="24" r="14"/><circle cx="24" cy="24" r="6"/><path d="M24 4v8M24 36v8M4 24h8M36 24h8"/></g><circle cx="24" cy="24" r="2.5" fill="currentColor"/></symbol>
+  <symbol id="snake" viewBox="0 0 48 48"><path d="M10 12c0-4 3-6 7-6h10c5 0 8 3 8 7s-3 7-8 7H20c-5 0-8 3-8 8s3 8 8 8h9" fill="none" stroke="currentColor" stroke-width="4.2" stroke-linecap="round"/><circle cx="34" cy="36" r="5" fill="currentColor"/><circle cx="35.5" cy="34.5" r="1" fill="#090b14"/></symbol>
+  <symbol id="sapper" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><circle cx="24" cy="24" r="10"/><path d="M24 5v7M24 36v7M5 24h7M36 24h7M10.5 10.5l5 5M32.5 32.5l5 5M37.5 10.5l-5 5M15.5 32.5l-5 5"/></g><circle cx="21" cy="21" r="2" fill="currentColor"/><circle cx="28" cy="27" r="1.8" fill="currentColor" opacity=".72"/></symbol>
+  <symbol id="quiz" viewBox="0 0 48 48"><path d="M10 9h28a5 5 0 0 1 5 5v17a5 5 0 0 1-5 5H24l-9 7v-7h-5a5 5 0 0 1-5-5V14a5 5 0 0 1 5-5Z" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"/><path d="M19 19c.8-4 9.8-5 10 1 .1 3.8-5 4-5 8" fill="none" stroke="currentColor" stroke-width="3.3" stroke-linecap="round"/><circle cx="24" cy="32" r="2" fill="currentColor"/></symbol>
+  <symbol id="echo" viewBox="0 0 48 48"><circle cx="24" cy="24" r="4" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="3.1" stroke-linecap="round"><path d="M17 17a10 10 0 0 0 0 14M31 17a10 10 0 0 1 0 14"/><path d="M11.5 11.5a18 18 0 0 0 0 25M36.5 11.5a18 18 0 0 1 0 25"/></g></symbol>
+  <symbol id="memory" viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="3.2" stroke-linejoin="round"><rect x="8" y="11" width="23" height="29" rx="5"/><rect x="17" y="7" width="23" height="29" rx="5"/><path d="M25 17h7M25 23h7"/></g></symbol>
+  <symbol id="scene-merge" viewBox="0 0 96 64"><g fill="currentColor"><rect x="10" y="18" width="28" height="28" rx="8" opacity=".28"/><rect x="36" y="8" width="32" height="32" rx="9" opacity=".52"/><rect x="58" y="31" width="27" height="27" rx="8" opacity=".78"/></g><path d="M27 32h16M52 26l8 7-8 7" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/></symbol>
+  <symbol id="scene-reaction" viewBox="0 0 96 64"><path d="M17 17h18M10 27h20M16 38h14" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".4"/><circle cx="61" cy="31" r="21" fill="currentColor" opacity=".18"/><circle cx="61" cy="31" r="13" fill="none" stroke="currentColor" stroke-width="5" opacity=".75"/><circle cx="61" cy="31" r="4" fill="currentColor"/><path d="M76 12l3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6Z" fill="currentColor" opacity=".7"/></symbol>
+  <symbol id="scene-snake" viewBox="0 0 96 64"><path d="M10 20c0-7 6-11 14-11h20c10 0 15 5 15 13s-6 13-16 13H33c-9 0-14 4-14 11s5 10 13 10h28" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" opacity=".78"/><circle cx="65" cy="53" r="9" fill="currentColor"/><circle cx="67" cy="50" r="2" fill="#0d1320"/><circle cx="81" cy="15" r="7" fill="none" stroke="currentColor" stroke-width="4" opacity=".5"/><path d="M84 9l5-5" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".5"/></symbol>
+  <symbol id="scene-sapper" viewBox="0 0 96 64"><g fill="none" stroke="currentColor" stroke-width="2.5" opacity=".55"><rect x="11" y="10" width="16" height="16" rx="4"/><rect x="30" y="10" width="16" height="16" rx="4"/><rect x="49" y="10" width="16" height="16" rx="4"/><rect x="11" y="29" width="16" height="16" rx="4"/><rect x="30" y="29" width="16" height="16" rx="4"/><rect x="49" y="29" width="16" height="16" rx="4"/></g><path d="M74 12v39" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M75 13h16l-7 9 7 9H75Z" fill="currentColor" opacity=".78"/><circle cx="38" cy="37" r="5" fill="currentColor" opacity=".75"/></symbol>
+  <symbol id="scene-quiz" viewBox="0 0 96 64"><g fill="none" stroke="currentColor" stroke-width="3"><rect x="10" y="10" width="32" height="18" rx="7" opacity=".75"/><rect x="10" y="35" width="32" height="18" rx="7" opacity=".45"/><rect x="49" y="10" width="32" height="18" rx="7" opacity=".55"/><rect x="49" y="35" width="32" height="18" rx="7" opacity=".3"/></g><circle cx="26" cy="19" r="4" fill="currentColor"/><path d="M57 19h16M18 44h16M57 44h16" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".65"/></symbol>
+  <symbol id="scene-echo" viewBox="0 0 96 64"><rect x="11" y="10" width="31" height="20" rx="9" fill="currentColor" opacity=".28"/><rect x="47" y="10" width="31" height="20" rx="9" fill="currentColor" opacity=".7"/><rect x="11" y="35" width="31" height="20" rx="9" fill="currentColor" opacity=".5"/><rect x="47" y="35" width="31" height="20" rx="9" fill="currentColor" opacity=".2"/><path d="M83 18c5 4 5 10 0 14M88 13c8 7 8 17 0 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" opacity=".55"/></symbol>
+  <symbol id="scene-memory" viewBox="0 0 96 64"><g transform="translate(17 7) rotate(-8 20 24)"><rect width="38" height="50" rx="10" fill="currentColor" opacity=".24"/><path d="M19 11l3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7Z" fill="currentColor" opacity=".78"/></g><g transform="translate(47 8) rotate(8 18 23)"><rect width="36" height="48" rx="10" fill="currentColor" opacity=".58"/><circle cx="18" cy="23" r="8" fill="none" stroke="currentColor" stroke-width="3" opacity=".8"/></g></symbol>
 </svg>

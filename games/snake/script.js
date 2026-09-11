@@ -8,7 +8,8 @@ let highScore=Number(localStorage.getItem('snake-high-score')||0);
 const occupied=(x,y)=>body.some((p)=>p.x===x&&p.y===y);
 function placeFood(){let x,y;do{x=Math.floor(Math.random()*GRID)+1;y=Math.floor(Math.random()*GRID)+1}while(occupied(x,y));food={x,y}}
 function updateHud(){scoreEl.textContent=`Счёт: ${score}`;highEl.textContent=`Рекорд: ${highScore}`;window.parent.postMessage({__hub:1,type:'score',value:score},'*')}
-function render(){let html=`<div class="food" style="grid-area:${food.y}/${food.x}"></div>`;body.forEach((p)=>{html+=`<div class="head" style="grid-area:${p.y}/${p.x}"></div>`});boardEl.innerHTML=html}
+function dirName(){if(velocity.x>0)return'right';if(velocity.x<0)return'left';if(velocity.y<0)return'up';return'down'}
+function render(){let html=`<div class="food" style="grid-area:${food.y}/${food.x}"></div>`;body.forEach((p,i)=>{html+=`<div class="${i===0?'snake-head':'snake-body'}"${i===0?` data-dir="${dirName()}"`:''} style="grid-area:${p.y}/${p.x}"></div>`});boardEl.innerHTML=html}
 function finish(){if(ended)return;ended=true;window.parent.postMessage({__hub:1,type:'finish',score},'*')}
 function tick(){
   if(ended||paused)return;velocity=nextVelocity;const head={x:body[0].x+velocity.x,y:body[0].y+velocity.y};const ate=head.x===food.x&&head.y===food.y;

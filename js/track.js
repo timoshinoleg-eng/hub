@@ -21,6 +21,11 @@ export const hasConsent = () => {
 export const setConsent = () => {
   try { localStorage.setItem(CONSENT_KEY, '1'); } catch { /* ignore */ }
 };
+/** Whether this deployment has a usable Hub subscription backend and explicit product gate. */
+export const subscriptionAvailable = () => {
+  const cfgEnabled = typeof window !== 'undefined' && window.HUB_CONFIG?.notificationsEnabled === true;
+  return Boolean(ENDPOINT) && cfgEnabled;
+};
 
 function initData() {
   const raw = window.WebApp?.initData;
@@ -58,6 +63,9 @@ export function track(action, game = null, value = null) {
 
 export async function subscribe(gameId = null) {
   if (!hasConsent()) return { ok: false, reason: 'no_consent' };
+  if (typeof window !== 'undefined' && window.HUB_CONFIG?.notificationsEnabled !== true) {
+    return { ok: false, reason: 'notifications_disabled' };
+  }
   if (!ENDPOINT) return { ok: false, reason: RAW_ENDPOINT ? 'insecure_endpoint' : 'no_endpoint' };
   const signed = initData();
   if (!signed) return { ok: false, reason: 'no_auth' };

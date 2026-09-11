@@ -3,7 +3,7 @@ const storage = new Map();
 let beacon = null;
 let fetched = null;
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {
-  HUB_TRACK_ENDPOINT: 'https://hub.example.test/ev', WebApp: { initData: 'signed-max-init-data' }, __hubStartParam: '',
+  HUB_TRACK_ENDPOINT: 'https://hub.example.test/ev', HUB_CONFIG: { notificationsEnabled: true }, WebApp: { initData: 'signed-max-init-data' }, __hubStartParam: '',
 } });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
   getItem: (k) => storage.has(k) ? storage.get(k) : null,

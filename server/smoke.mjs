@@ -94,8 +94,12 @@ check('/stats поддерживает валидное временное ок�
 r = await get('/export.csv');
 check('/export.csv закрыт без admin token', r.statusCode === 401, `код ${r.statusCode}`);
 r = await get('/export.csv', admin);
+const csvLines = r.body.trim().split(/\r?\n/);
+const csvHeader = (csvLines[0] || '').split(',');
+const csvCells = csvLines.slice(1).flatMap((line) => line.split(',')).map((cell) => cell.replace(/^"|"$/g, ''));
 check('/export.csv доступен администратору', r.statusCode === 200 && r.body.startsWith('ts,uid_hash,session_id,game,action,value,sp'));
-check('/export.csv не содержит сырого user_id', !r.body.includes('555'));
+check('/export.csv не содержит колонки сырого user_id', !csvHeader.includes('user_id'));
+check('/export.csv не содержит сырого user_id как CSV-поле', !csvCells.includes('555'));
 check('/export.csv содержит HMAC подписанного пользователя', r.body.includes(db.hashUid(555)));
 
 r = await post('/forget', { user_id: 555 });

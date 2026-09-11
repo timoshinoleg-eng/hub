@@ -1,14 +1,16 @@
-import { bridge } from './bridge.js?v=20260910-1';
-import { track, hasConsent, setConsent, subscribe } from './track.js';
-import { cardDataUrl, shareText } from './share.js';
-import { duelResult } from './duel.js';
-import { dailySeed } from './daily.js';
-import { observeVisit } from './engagement.js';
-import { getGameProgress, getSummary, recordFinish } from './progress.js';
-import { GAMES, byId, visible } from './games.js';
+const revision = window.HUB_ASSET_REVISION || '20260911-rc1';
+
+const { bridge } = await import(`./bridge.js?v=${encodeURIComponent(revision)}`);
+const { track, hasConsent, setConsent, subscribe, subscriptionAvailable } = await import(`./track.js?v=${encodeURIComponent(revision)}`);
+const { cardDataUrl, shareText } = await import(`./share.js?v=${encodeURIComponent(revision)}`);
+const { duelResult } = await import(`./duel.js?v=${encodeURIComponent(revision)}`);
+const { dailySeed } = await import(`./daily.js?v=${encodeURIComponent(revision)}`);
+const { observeVisit } = await import(`./engagement.js?v=${encodeURIComponent(revision)}`);
+const { getGameProgress, getSummary, recordFinish } = await import(`./progress.js?v=${encodeURIComponent(revision)}`);
+const { challengeIntroText, challengeResultState, dailyHeroState, dailyResultText, recordBadgeText } = await import(`./ui-state.js?v=${encodeURIComponent(revision)}`);
+const { GAMES, byId, visible } = await import(`./games.js?v=${encodeURIComponent(revision)}`);
 
 const CFG = window.HUB_CONFIG || {};
-const NOTIFICATIONS_ENABLED = CFG.notificationsEnabled === true;
 const SHOW_ALL = new URLSearchParams(location.search).has('all');
 const HUB_NAME = CFG.hubName || 'Игротека';
 const $ = (s) => document.querySelector(s);
@@ -23,12 +25,24 @@ window.__hubStartParam = bridge.startParam();
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
   }[c]));
 }
 function iconSvg(id, cls = 'game-icon') {
-  const safe = /^[a-z]+$/.test(String(id || '')) ? id : 'brand';
+  const safe = /^[a-z-]+$/.test(String(id || '')) ? id : 'brand';
   return `<svg class="${cls}" aria-hidden="true"><use href="assets/icons.svg#${safe}"></use></svg>`;
+}
+function mascotSvg(stateName = 'idle', cls = 'mascot-icon') {
+  const safe = ['idle', 'happy', 'wow', 'challenge', 'fail'].includes(stateName) ? stateName : 'idle';
+  return iconSvg(`mascot-${safe}`, cls);
+}
+function sceneSvg(id, cls = 'scene-icon') {
+  const safe = /^[a-z]+$/.test(String(id || '')) ? id : 'merge';
+  return iconSvg(`scene-${safe}`, cls);
 }
 function formatBest(g, best) {
   return best == null ? 'Рекорда ещё нет' : `Рекорд ${best}${g.unit ? ' ' + g.unit : ''}`;
@@ -56,6 +70,8 @@ function renderMenu() {
   const today = dailySeed();
   const summary = getSummary(today);
   const daily = dailyGameForDate(today);
+  const all = visible(SHOW_ALL);
+  const catalog = all.filter((g) => g.id !== daily?.id);
 
   $('#streak-chip').innerHTML = summary.streak > 0
     ? `<strong>${summary.streak}</strong><span>дн. подряд</span>`
@@ -63,41 +79,49 @@ function renderMenu() {
 
   if (daily) {
     const pg = getGameProgress(daily.id);
+    const heroState = dailyHeroState(pg, today, summary.completedToday);
+    const mascotState = heroState.completed ? 'happy' : 'challenge';
     $('#daily-card').innerHTML =
-      `<div class="daily-card" style="--d1:${daily.accent};--d2:${daily.accent2}">` +
-        `<div class="daily-top"><span class="daily-label">✦ ВЫЗОВ ДНЯ</span>` +
-        `<span class="daily-status">${summary.completedToday ? '✓ серия сохранена' : 'новый шанс сегодня'}</span></div>` +
+      `<div class="daily-card${heroState.completed ? ' is-complete' : ''}" style="--d1:${daily.accent};--d2:${daily.accent2}">` +
+        `<div class="daily-mascot" aria-hidden="true">${mascotSvg(mascotState, 'daily-mascot-icon')}</div>` +
+        `<div class="daily-top"><span class="daily-label">✦ ВЫЗОВ ДНЯ</span><span class="daily-status">${esc(heroState.status)}</span></div>` +
         `<div class="daily-main"><div class="daily-emoji">${iconSvg(daily.icon, 'daily-icon')}</div>` +
-        `<div class="daily-copy"><h2>${esc(daily.title)}</h2>` +
-        `<p>${esc(daily.tagline)} · ${esc(formatBest(daily, pg.best))}</p></div></div>` +
-        `<button class="daily-play" id="daily-play">${summary.completedToday ? 'Сыграть ещё раз' : 'Играть сейчас'}</button>` +
+        `<div class="daily-copy"><h2>${esc(daily.title)}</h2><p>${esc(daily.tagline)} · ${esc(formatBest(daily, pg.best))}</p></div></div>` +
+        `<button class="daily-play" id="daily-play">${esc(heroState.cta)}</button>` +
       `</div>`;
     $('#daily-play').onclick = () => openGame(daily.id);
   }
 
-  $('#progress-strip').innerHTML =
-    `<div class="pstat"><strong>${summary.finishes}</strong><span>завершено игр</span></div>` +
-    `<div class="pstat"><strong>${summary.records}</strong><span>личных рекордов</span></div>` +
-    `<div class="pstat"><strong>${summary.streak}</strong><span>дней подряд</span></div>`;
+  const progress = $('#progress-strip');
+  if (summary.finishes === 0) {
+    progress.classList.add('is-empty');
+    progress.innerHTML = `<div class="progress-first"><span class="progress-first-mark">${mascotSvg('idle', 'progress-mascot')}</span><span><strong>Сыграй первую партию</strong><small>Рекорд и серия появятся здесь автоматически.</small></span></div>`;
+  } else {
+    progress.classList.remove('is-empty');
+    progress.innerHTML =
+      `<div class="pstat"><strong>${summary.finishes}</strong><span>завершено игр</span></div>` +
+      `<div class="pstat"><strong>${summary.records}</strong><span>личных рекордов</span></div>` +
+      `<div class="pstat"><strong>${summary.streak}</strong><span>дней подряд</span></div>`;
+  }
 
   const list = $('#games');
   list.innerHTML = '';
-  for (const g of visible(SHOW_ALL)) {
+  for (const g of catalog) {
     const pg = getGameProgress(g.id);
     const card = el('button', 'gcard' + (g.enabled ? '' : ' draft'));
     card.dataset.id = g.id;
     card.style.setProperty('--game', g.accent || '#7568ff');
     card.style.setProperty('--game2', g.accent2 || g.accent || '#4ce3e8');
     card.innerHTML =
+      `<span class="gscene" aria-hidden="true">${sceneSvg(g.id)}</span>` +
       `<div class="gcard-top"><span class="ge">${iconSvg(g.icon)}</span>` +
-      `<span class="gbadge ${g.cfg?.daily ? 'daily' : ''}">${g.cfg?.daily ? '✦ СЕГОДНЯ' : esc(g.genre || g.length)}</span></div>` +
+      `<span class="gbadge ${g.cfg?.daily ? 'daily' : ''}">${g.cfg?.daily ? '✦ ЕЖЕДНЕВНО' : esc(g.genre || g.length)}</span></div>` +
       `<span class="gt"><b>${esc(g.title)}</b><i>${esc(g.tagline)}</i></span>` +
-      `<span class="gfoot"><span class="gbest">${esc(pg.best == null ? g.length : formatBest(g, pg.best))}</span>` +
-      `<span class="garrow">›</span></span>`;
+      `<span class="gfoot"><span class="gbest">${esc(pg.best == null ? g.length : formatBest(g, pg.best))}</span><span class="garrow">›</span></span>`;
     card.addEventListener('click', () => openGame(g.id));
     list.appendChild(card);
   }
-  $('#count').textContent = `${visible(SHOW_ALL).length} игр`;
+  $('#count').textContent = daily ? `${catalog.length} игр + вызов` : `${catalog.length} игр`;
 }
 
 let offBack = () => {};
@@ -108,13 +132,24 @@ function tipSeen(id) {
 function markTip(id) {
   try { localStorage.setItem('hub_tip_' + id, '1'); } catch {}
 }
+function hintVisual(g) {
+  const kind = /^[a-z]+$/.test(g?.hint || '') ? g.hint : 'tap';
+  return `<div class="hint-visual hint-${kind}" aria-hidden="true">${sceneSvg(g.id, 'hint-scene')}<span class="hint-gesture"></span></div>`;
+}
 function showGameTip(g) {
   if (!g?.howTo || tipSeen(g.id)) return;
   markTip(g.id);
-  const n = el('div', 'game-tip');
-  n.innerHTML = `${esc(g.howTo)}<small>Подсказка показывается только один раз</small>`;
+  const n = el('div', 'game-tip visual-tip');
+  n.innerHTML = `${hintVisual(g)}<div class="hint-copy">${esc(g.howTo)}<small>${esc(g.length)} · результат сохранится автоматически</small></div>`;
   $('#overlay').appendChild(n);
-  setTimeout(() => n.remove(), 4200);
+  setTimeout(() => n.remove(), 3900);
+}
+function pulseScore() {
+  const score = $('#game-score');
+  if (!score || !score.textContent) return;
+  score.classList.remove('score-pop');
+  void score.offsetWidth;
+  score.classList.add('score-pop');
 }
 function openGame(id, challenge = null) {
   const g = byId(id);
@@ -126,6 +161,7 @@ function openGame(id, challenge = null) {
   lastScoreHaptic = 0;
 
   const pg = getGameProgress(g.id);
+  document.documentElement.style.setProperty('--active-game', g.accent || '#6f63ff');
   $('#game-title').textContent = g.title;
   $('#game-meta').textContent = `${g.genre} · ${formatBest(g, pg.best)}`;
   $('#game-score').textContent = '';
@@ -134,7 +170,9 @@ function openGame(id, challenge = null) {
   if (g.cfg?.daily) src += '?seed=' + dailySeed();
   if (challenge != null) src += (src.includes('?') ? '&' : '?') + 'challenge=' + challenge;
 
-  $('#game-frame').src = src;
+  const frame = $('#game-frame');
+  frame.style.opacity = '0';
+  frame.src = src;
   $('#overlay').innerHTML = '';
   document.body.dataset.view = 'game';
   track('open_game', g.id);
@@ -163,6 +201,7 @@ function onMessage(e) {
   if (d.type === 'ready') {
     if (!state.game || d.game !== state.game.id) return;
     f.contentWindow.postMessage({ __hub: 1, type: 'cfg', game: d.game, cfg: state.game.cfg || {} }, '*');
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '1'; }));
     return;
   }
   if (!state.game) return;
@@ -172,6 +211,7 @@ function onMessage(e) {
     const changed = String(state.score) !== String(d.value);
     state.score = d.value;
     $('#game-score').textContent = d.value;
+    if (hadScore && changed) pulseScore();
     const now = performance.now();
     if (hadScore && changed && now - lastScoreHaptic > 140) {
       bridge.haptic('selection');
@@ -193,7 +233,8 @@ function onMessage(e) {
 
 const NOTIFY_PROMPT_KEY = 'hub_notify_prompted_v1';
 function shouldOfferNotify(today) {
-  if (!NOTIFICATIONS_ENABLED || hasConsent() || getSummary(today).finishes < 3) return false;
+  if (CFG.notificationsEnabled !== true) return false;
+  if (!subscriptionAvailable() || hasConsent() || getSummary(today).finishes < 3) return false;
   try { return localStorage.getItem(NOTIFY_PROMPT_KEY) !== '1'; } catch { return false; }
 }
 function markNotifyPrompted() {
@@ -202,9 +243,7 @@ function markNotifyPrompted() {
 
 function confettiHtml() {
   const colors = ['#ff5f7e', '#ffc760', '#54e6d2', '#7568ff', '#fff'];
-  return `<div class="confetti">${Array.from({ length: 22 }, (_, i) =>
-    `<i style="--x:${(i * 37) % 100}%;--c:${colors[i % colors.length]};--d:${1.7 + (i % 5) * .18}s;--delay:${(i % 7) * .04}s;--r:${(i * 29) % 180}deg;--drift:${-34 + (i % 9) * 8}px"></i>`
-  ).join('')}</div>`;
+  return `<div class="confetti">${Array.from({ length: 22 }, (_, i) => `<i style="--x:${(i * 37) % 100}%;--c:${colors[i % colors.length]};--d:${1.7 + (i % 5) * .18}s;--delay:${(i % 7) * .04}s;--r:${(i * 29) % 180}deg;--drift:${-34 + (i % 9) * 8}px"></i>`).join('')}</div>`;
 }
 function showResult() {
   const g = state.game;
@@ -212,39 +251,45 @@ function showResult() {
   const score = state.score ?? 0;
   const meta = state.finishMeta || {};
   const link = deepLink(g.id, score);
-  const duel = duelResult(score, state.challenge, g.cfg?.higherIsBetter !== false);
-  const box = el('div', 'result');
+  const higherIsBetter = g.cfg?.higherIsBetter !== false;
+  const duel = duelResult(score, state.challenge, higherIsBetter);
+  const duelState = challengeResultState(duel, higherIsBetter);
+  const box = el('div', 'result finish-sweep');
 
-  const duelLine = duel
-    ? `<div class="rduel ${duel.won ? 'win' : 'lose'}">${duel.won ? '🏆 Челлендж выигран!' : 'До победы не хватило совсем немного'}</div>`
-    : '';
+  const duelLine = duelState ? `<div class="rduel ${duelState.kind}">${esc(duelState.text)}</div>` : '';
   if (duel) track(duel.won ? 'duel_win' : 'duel_lose', g.id, score);
 
-  const dailyLine = meta.dailyAdvanced
-    ? `<div class="rdaily">Серия продлена: ${meta.streak} ${meta.streak === 1 ? 'день' : 'дн.'}</div>`
-    : '';
+  const dailyText = dailyResultText(meta);
+  const dailyLine = dailyText ? `<div class="rdaily">${esc(dailyText)}</div>` : '';
+  const recordBadge = recordBadgeText(meta);
+  const mascotState = duelState?.kind === 'lose' ? 'fail' : (meta.newBest || meta.dailyAdvanced || duelState?.kind === 'win') ? 'happy' : duelState ? 'challenge' : 'idle';
+  const shareBadge = meta.newBest ? 'НОВЫЙ РЕКОРД' : meta.dailyAdvanced ? 'ВЫЗОВ ДНЯ' : duelState?.kind === 'win' ? 'ПОБЕДА' : '';
 
   const offerNotify = shouldOfferNotify(dailySeed());
   if (offerNotify) markNotifyPrompted();
 
   box.innerHTML =
     `<div class="rcard" style="--result-glow:${g.accent || '#6d5cff'}">` +
+      `<div class="result-mascot" aria-hidden="true">${mascotSvg(mascotState, 'result-mascot-icon')}</div>` +
       `${meta.newBest ? confettiHtml() : ''}` +
-      `${meta.newBest ? '<div class="record-pill">✦ НОВЫЙ РЕКОРД</div>' : ''}` +
+      `${recordBadge ? `<div class="record-pill">${esc(recordBadge)}</div>` : ''}` +
       `<div class="result-icon-wrap">${iconSvg(g.icon, 'result-icon')}</div>` +
       `<div class="rttl">${esc(g.title)}</div>` +
       `<div class="result-score">${score}${g.unit ? ` <span style="font-size:14px;letter-spacing:0">${esc(g.unit)}</span>` : ''}</div>` +
       `<div class="rbest">${meta.newBest ? 'Лучший результат сохранён' : esc(formatBest(g, meta.best))}</div>` +
       `${duelLine}${dailyLine}` +
       `<div class="rrow"><button class="btn primary" id="r-again">Ещё раз</button><button class="btn" id="r-share">Поделиться</button></div>` +
-      `<div class="result-links"><button class="result-link" id="r-menu">К играм</button>` +
-      `${offerNotify ? '<button class="result-link" id="r-notify">Получать новинки</button>' : ''}</div>` +
+      `<div class="result-links"><button class="result-link" id="r-menu">К играм</button>${offerNotify ? '<button class="result-link" id="r-notify">Получать новинки</button>' : ''}</div>` +
       `<img class="rimg" alt="карточка результата"><div class="rhint" id="r-hint"></div>` +
     `</div>`;
 
-  box.querySelector('.rimg').src = cardDataUrl({
-    title: g.title, score, unit: g.unit, hubName: HUB_NAME, accent: g.accent, accent2: g.accent2,
-  });
+  const resultCard = box.querySelector('.rcard');
+  const resultImage = box.querySelector('.rimg');
+  const resultHint = box.querySelector('#r-hint');
+  const shareBtn = box.querySelector('#r-share');
+
+  resultImage.src = cardDataUrl({ gameId: g.id, title: g.title, score, unit: g.unit, hubName: HUB_NAME, accent: g.accent, accent2: g.accent2, badge: shareBadge });
+
   box.querySelector('#r-again').onclick = () => {
     track('replay', g.id, score);
     box.remove();
@@ -254,14 +299,22 @@ function showResult() {
     box.remove();
     backToMenu();
   };
-  box.querySelector('#r-share').onclick = async () => {
+  shareBtn.onclick = async () => {
     const ok = await bridge.share(shareText({ title: g.title, score, unit: g.unit, link }), link);
     track(ok ? 'share_ok' : 'share_fallback', g.id, score);
-    if (!ok) {
-      box.querySelector('#r-hint').textContent = 'Шаринг не открылся — карточка результата показана ниже.';
-      box.querySelector('.rimg').style.display = 'block';
+    if (ok) {
+      resultCard.classList.remove('share-fallback');
+      resultHint.textContent = '';
+      resultImage.style.display = 'none';
+      shareBtn.textContent = 'Поделиться';
+      return;
     }
+    resultCard.classList.add('share-fallback');
+    resultHint.textContent = 'Не удалось открыть шаринг. Карточка результата доступна ниже.';
+    resultImage.style.display = 'block';
+    shareBtn.textContent = 'Повторить шаринг';
   };
+
   const notifyBtn = box.querySelector('#r-notify');
   if (notifyBtn) {
     notifyBtn.onclick = async () => {
@@ -286,12 +339,13 @@ async function doSubscribe(btn, g, score) {
   if (r.ok) bridge.haptic('notify');
 }
 function showConsent(onAccept) {
-  const box = el('div', 'result');
+  const box = el('div', 'result consent-layer');
+  const policy = CFG.policyUrl ? ` <a href="${CFG.policyUrl}" target="_blank" rel="noopener">Подробнее о данных</a>` : '';
   box.innerHTML =
-    `<div class="rcard"><div class="rttl" style="font-size:18px;color:#fff;margin-bottom:8px">Получать игровые новинки?</div>` +
-    `<p style="margin:0 0 14px;color:var(--mut);font-size:12.5px">Чтобы написать вам в MAX, сервер проверит подписанные данные приложения и сохранит идентификатор пользователя. ` +
-    `<a href="${CFG.policyUrl || '#'}" target="_blank" rel="noopener">Политика обработки данных</a></p>` +
-    `<div class="rrow"><button class="btn primary" id="c-yes">Согласен</button><button class="btn" id="c-no">Не надо</button></div></div>`;
+    `<div class="rcard consent-card"><div class="consent-icon-wrap">${mascotSvg('idle', 'consent-icon')}</div>` +
+    `<div class="consent-title">Включить игровые уведомления?</div>` +
+    `<p>MAX передаст серверу подписанные данные приложения. Мы сохраним идентификатор только для отправки игровых новинок.${policy}</p>` +
+    `<div class="rrow"><button class="btn primary" id="c-yes">Включить</button><button class="btn" id="c-no">Не сейчас</button></div></div>`;
   box.querySelector('#c-yes').onclick = () => {
     setConsent();
     track('consent_yes');
@@ -331,10 +385,8 @@ function init() {
     openGame(sp.game.id, sp.challenge);
     if (sp.challenge != null) {
       const higher = sp.game.cfg?.higherIsBetter !== false;
-      const txt = higher
-        ? `Челлендж: набери больше ${sp.challenge}${sp.game.unit ? ' ' + sp.game.unit : ''} 🎯`
-        : `Челлендж: уложись в ${sp.challenge}${sp.game.unit ? ' ' + sp.game.unit : ''} 🎯`;
-      const n = el('div', 'challenge', txt);
+      const txt = challengeIntroText(sp.challenge, higher, sp.game.unit || '');
+      const n = el('div', 'challenge', esc(txt));
       $('#overlay').appendChild(n);
       setTimeout(() => n.remove(), 4000);
     }

@@ -22,8 +22,16 @@ jobs:
         run: npm run check
       - name: Product and playability contract
         run: npm run smoke:product
+      - name: Quizzzz integration contract
+        run: npm run smoke:quizzzz
+      - name: Full Quizzzz feature-parity contract
+        run: npm run smoke:quizzzz-parity
+      - name: UI state contract
+        run: npm run smoke:ui-state
       - name: Iframe bridge contract
         run: npm run smoke:bridge
+      - name: MAX cached-shell recovery
+        run: npm run smoke:cache-recovery
       - name: Analytics transport and privacy
         run: npm run smoke:track
       - name: MAX initData authentication
@@ -40,7 +48,74 @@ jobs:
         run: npm run smoke:server
       - name: Bot contracts
         run: npm run smoke:bot
+      - name: Production bot runtime contract
+        run: node tools/bot-runtime.mjs
+      - name: Notification safety contract
+        run: node tools/notifications.mjs
+      - name: Notification gating client contract
+        run: node tools/notification-gating.mjs
+      - name: FastAPI docs surface decision contract
+        run: node tools/gateway-docs.mjs
+      - name: Production renderer preflight contract
+        run: node tools/production-renderer-preflight.mjs
+      - name: Production compose and static-cache contract
+        run: node tools/production-compose.mjs
       - name: Daily determinism
         run: npm run smoke:daily
       - name: Duel logic
         run: npm run smoke:duel
+  visual-snapshots:
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Render exact-build mobile screenshots and unified launch routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p visual-snapshots quiz
+          # Visual snapshots exercise the exact shell and main app directly; bootstrap
+          # launch routing is tested separately below in the same real browser.
+          sed -e '/st.max.ru\/js\/max-web-app.js/d' -e 's#js/bootstrap.js#js/main.js#' index.html > _visual-index.html
+          sed '/st.max.ru\/js\/max-web-app.js/d' index.html > _route-index.html
+          cat > _visual-reaction.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#app{margin:0;width:100%;height:100%;border:0;background:#090b14;overflow:hidden}</style><iframe id="app" src="/_visual-index.html"></iframe><script>const app=document.getElementById('app');app.addEventListener('load',()=>setTimeout(()=>{const d=app.contentDocument;d.querySelector('[data-id="reaction"]')?.click();setTimeout(()=>{const g=d.querySelector('#game-frame');g?.contentDocument?.querySelector('#start')?.click()},900)},350));</script>
+          HTML
+          cat > quiz/index.html <<'HTML'
+          <!doctype html><meta charset="utf-8"><title>Quizzzz route stub</title><body id="quiz-route"></body><script>document.getElementById('quiz-route').textContent=location.pathname+location.search</script>
+          HTML
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/hub-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" || true' EXIT
+          sleep 1
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$CHROME"
+          "$CHROME" --headless --no-sandbox --disable-gpu --virtual-time-budget=1800 --dump-dom http://127.0.0.1:4173/_visual-index.html > /tmp/menu-dom.html
+          grep -q 'class="gcard' /tmp/menu-dom.html
+
+          # Cross-app launch smoke: old Quizzzz links must survive the new Hub root.
+          for payload in daily leaderboard d_ciDu3lToken challenge_LEGACY42; do
+            "$CHROME" --headless --no-sandbox --disable-gpu --virtual-time-budget=1800 --dump-dom "http://127.0.0.1:4173/_route-index.html?startapp=${payload}" > "/tmp/route-${payload}.html"
+            grep -q 'id="quiz-route"' "/tmp/route-${payload}.html"
+            grep -q 'from=hub' "/tmp/route-${payload}.html"
+            grep -q "startapp=${payload}" "/tmp/route-${payload}.html"
+          done
+
+          render() {
+            local size="$1" out="$2" url="$3" budget="$4"
+            "$CHROME" --headless --no-sandbox --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size="$size" --virtual-time-budget="$budget" --screenshot="$out" "$url"
+          }
+          render 360,640 visual-snapshots/menu-360x640.png http://127.0.0.1:4173/_visual-index.html 1800
+          render 390,844 visual-snapshots/menu-390x844.png http://127.0.0.1:4173/_visual-index.html 1800
+          render 360,640 visual-snapshots/reaction-360x640.png http://127.0.0.1:4173/_visual-reaction.html 4200
+          render 390,844 visual-snapshots/reaction-390x844.png http://127.0.0.1:4173/_visual-reaction.html 4200
+          file visual-snapshots/*.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-${{ github.event.pull_request.head.sha || github.sha }}
+          path: visual-snapshots/*.png
+          if-no-files-found: error
+          retention-days: 7

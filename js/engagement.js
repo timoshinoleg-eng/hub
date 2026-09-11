@@ -1,4 +1,5 @@
-import { dailySeed } from './daily.js';
+const revision = (typeof window !== 'undefined' && window.HUB_ASSET_REVISION) || '20260911-rc1';
+const { dailySeed } = await import(`./daily.js?v=${encodeURIComponent(revision)}`);
 
 const KEY = 'hub_visit_v1';
 
