@@ -74,6 +74,23 @@ Backup хранить отдельно от application host и проверят
 
 ## 4. Deploy order
 
+### 4.0 Bundled Docker release
+
+Для существующего Caddy-host применяйте `deploy/compose.production.yml`: он поднимает изолированные `hub-server`, `hub-bot` и `hub-static` в уже существующей Docker network. Добавьте `deploy/Caddyfile.hub` в Caddyfile **до** catch-all `handle`, проверьте конфигурацию, затем сначала поднимите `server` и `static`, проверьте `/hub/` и `/hub-api/health`, и только после этого запустите `bot`.
+
+```bash
+export HUB_RELEASE=<immutable-git-sha>
+export HUB_RUNTIME_CONFIG=/opt/hub/runtime-config.js
+export HUB_EXTRA_CA_CERT=/opt/quiz-battle/certs/ca-certificates.crt
+docker compose -f deploy/compose.production.yml up -d --build server static
+# после Caddy smoke:
+docker compose -f deploy/compose.production.yml up -d bot
+```
+
+В production `bot` запускается исключительно с `HUB_BOT_WEBHOOK_*`; long polling намеренно недоступен. Startup регистрирует только `/hub/bot/webhook` и очищает старую MAX subscription в этот последний шаг. `runtime-config.js` не содержит секретов; не задавайте `notificationsEnabled: true` без опубликованных реальных реквизитов и политики.
+
+Если операторская сеть использует дополнительный доверенный CA для `platform-api2.max.ru`, передайте его в `HUB_EXTRA_CA_CERT`. Compose монтирует bundle read-only и задаёт `NODE_EXTRA_CA_CERTS`; не отключайте TLS verification через `NODE_TLS_REJECT_UNAUTHORIZED=0`.
+
 ### 4.1 API server
 
 Сначала запустить/обновить `server`:

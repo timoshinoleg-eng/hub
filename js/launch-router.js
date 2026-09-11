@@ -1,4 +1,5 @@
-import { bridge } from './bridge.js';
+const revision = typeof window !== 'undefined' ? (window.HUB_ASSET_REVISION || '20260911-rc1') : '20260911-rc1';
+const { bridge } = await import(`./bridge.js?v=${encodeURIComponent(revision)}`);
 
 const QUIZZZZ_EXACT = new Set(['daily', 'league', 'leaderboard', 'challenge_new']);
 const SAFE_START = /^[A-Za-z0-9_-]{1,512}$/;

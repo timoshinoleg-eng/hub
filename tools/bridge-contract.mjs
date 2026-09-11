@@ -45,5 +45,28 @@ window.WebApp = { shareContent() { throw new Error('unsupported'); }, openMaxLin
 await bridge.share('Результат', 'https://example.test/game');
 ok(/^https:\/\/max\.ru\/:share\?text=/.test(maxLink || ''), 'fallback MAX deep-link открывается через openMaxLink');
 
+window.WebApp = {
+  ready() { throw new Error('MAX bridge is not attached yet'); },
+  expand() { throw new Error('MAX bridge is not attached yet'); },
+  HapticFeedback: { selectionChanged() { throw new Error('MAX bridge is not attached yet'); } },
+};
+ok(doesNotThrow(() => bridge.ready()), 'неподготовленный MAX ready не обрывает запуск хаба');
+ok(doesNotThrow(() => bridge.expand()), 'неподготовленный MAX expand не обрывает запуск хаба');
+ok(doesNotThrow(() => bridge.haptic('selection')), 'неподготовленный MAX haptic не обрывает интерфейс');
+
+let readyOwner = null;
+window.WebApp = { ready() { readyOwner = this; } };
+bridge.ready();
+ok(readyOwner === window.WebApp, 'MAX методы вызываются с корректным контекстом WebApp');
+
 if (fails) { console.error(`\nПровалено: ${fails}`); process.exit(1); }
 console.log('\nHandshake iframe и MAX share routing стабильны.');
+
+function doesNotThrow(fn) {
+  try {
+    fn();
+    return true;
+  } catch {
+    return false;
+  }
+}

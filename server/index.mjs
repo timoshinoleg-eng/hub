@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as db from './db.mjs';
 import { verifyMaxInitData } from './max-auth.mjs';
+import { notificationConfigProblems, notificationsEnabled } from './notifications.mjs';
 
 function safeEqual(a, b) {
   const aa = Buffer.from(String(a || ''));
@@ -20,6 +21,7 @@ function assertProductionConfig() {
   if (!process.env.BOT_TOKEN) problems.push('BOT_TOKEN обязателен для MAX initData validation');
   if ((process.env.HUB_ADMIN_TOKEN || '').length < 32) problems.push('HUB_ADMIN_TOKEN должен быть >=32 символов');
   if (!/^https:\/\//i.test(process.env.HUB_CORS_ORIGIN || '')) problems.push('HUB_CORS_ORIGIN должен быть https:// origin');
+  problems.push(...notificationConfigProblems());
   if (problems.length) throw new Error(`Unsafe production config: ${problems.join('; ')}`);
 }
 
@@ -88,6 +90,7 @@ export async function buildServer({ logger = true } = {}) {
   });
 
   app.post('/sub', async (req, reply) => {
+    if (!notificationsEnabled()) return reply.code(503).send({ error: 'subscriptions_disabled' });
     const b = bodyObject(req.body);
     if (b.consent !== true) return reply.code(400).send({ error: 'consent_required' });
     const auth = verifyBody(b);

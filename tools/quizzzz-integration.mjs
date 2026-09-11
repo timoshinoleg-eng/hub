@@ -42,11 +42,13 @@ const main = read('js/main.js');
 assert.ok(index.includes('<script src="runtime-config.js"></script>'), 'Hub loads deploy-time runtime config');
 assert.ok(index.includes('Object.assign({'), 'runtime config is merged over safe defaults');
 assert.ok(runtime.includes('window.HUB_CONFIG'), 'runtime config file has safe local defaults');
-assert.ok(index.includes('js/bootstrap.js') && !index.includes('js/main.js'), 'launch routing runs before the Hub application boot');
-assert.ok(bootstrap.includes('routeQuizzzzLaunch()') && bootstrap.includes("import('./main.js')"), 'bootstrap skips Hub main for Quizzzz launch intents');
+assert.ok(runtime.includes('HUB_ASSET_REVISION'), 'runtime config carries immutable cache revision');
+assert.ok(index.includes('js/bootstrap.js?v=') && !index.includes('js/main.js'), 'versioned launch routing runs before Hub application boot');
+assert.ok(bootstrap.includes('routeQuizzzzLaunch()') && bootstrap.includes('main.js?v='), 'bootstrap keeps Quizzzz routing before versioned Hub main');
 for (const key of ['WebAppStartParam', 'tgWebAppStartParam', 'startapp', 'start_param']) {
   assert.ok(bridge.includes(key), `Hub bridge reads ${key} launch parameter form`);
 }
+assert.ok(bridge.includes('fn.apply(owner, args)'), 'MAX bridge methods retain their WebApp owner context');
 assert.ok(track.includes('export const subscriptionAvailable'), 'Hub exposes subscription backend availability');
 assert.ok(main.includes('!subscriptionAvailable()'), 'notification CTA is suppressed when unified phase one has no Hub backend');
 
@@ -56,4 +58,4 @@ assert.ok(docs.includes('Hub Node bot must be disabled'), 'legacy Hub bot is for
 assert.ok(docs.includes('/quiz/'), 'gateway mount is documented');
 assert.ok(docs.includes('feat/hub-integration'), 'paired Quizzzz branch is documented');
 
-console.log('Quizzzz integration contract v3: ok');
+console.log('Quizzzz integration contract v4: ok');

@@ -1,0 +1,58 @@
+services:
+  server:
+    build:
+      context: ..
+      target: runtime
+    image: hub-runtime:${HUB_RELEASE:?HUB_RELEASE is required}
+    command: ["node", "server/index.mjs"]
+    env_file: ../../.env
+    environment:
+      NODE_EXTRA_CA_CERTS: /app/certs/extra-ca.crt
+    volumes:
+      - ${HUB_EXTRA_CA_CERT:?HUB_EXTRA_CA_CERT is required}:/app/certs/extra-ca.crt:ro
+    restart: unless-stopped
+    networks:
+      quiz-battle:
+        aliases: [hub-server]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  bot:
+    image: hub-runtime:${HUB_RELEASE:?HUB_RELEASE is required}
+    command: ["node", "bot/index.mjs"]
+    env_file: ../../.env
+    environment:
+      NODE_EXTRA_CA_CERTS: /app/certs/extra-ca.crt
+    volumes:
+      - ${HUB_EXTRA_CA_CERT:?HUB_EXTRA_CA_CERT is required}:/app/certs/extra-ca.crt:ro
+    restart: unless-stopped
+    networks:
+      quiz-battle:
+        aliases: [hub-bot]
+
+  static:
+    build:
+      context: ..
+      target: static
+    image: hub-static:${HUB_RELEASE:?HUB_RELEASE is required}
+    restart: unless-stopped
+    volumes:
+      - ${HUB_RUNTIME_CONFIG:?HUB_RUNTIME_CONFIG is required}:/usr/share/nginx/html/runtime-config.js:ro
+    networks:
+      quiz-battle:
+        aliases: [hub-static]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  quiz-battle:
+    external: true
+    name: ${HUB_SHARED_NETWORK:-quiz-battle_default}

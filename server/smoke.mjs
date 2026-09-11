@@ -14,6 +14,7 @@ process.env.HUB_HASH_SALT = 'smoke-hash-salt-0123456789abcdef0123456789abcdef';
 process.env.HUB_CORS_ORIGIN = 'https://hub.example.ru';
 process.env.BOT_TOKEN = BOT_TOKEN;
 process.env.HUB_ADMIN_TOKEN = ADMIN_TOKEN;
+process.env.HUB_NOTIFICATIONS_ENABLED = 'true';
 rmSync(TMP_DB, { force: true });
 
 function initData(userId, { age = 0, tamper = false } = {}) {
@@ -68,6 +69,11 @@ check('/sub записал подписанного пользователя', s
 r = await post('/sub', { init_data: initData(777, { tamper: true }), consent: true });
 check('/sub отклоняет поддельный initData', r.statusCode === 401, `код ${r.statusCode}`);
 
+process.env.HUB_NOTIFICATIONS_ENABLED = 'false';
+r = await post('/sub', { init_data: signed555, consent: true });
+check('/sub не сохраняет identity при отключённых уведомлениях', r.statusCode === 503, r.body);
+process.env.HUB_NOTIFICATIONS_ENABLED = 'true';
+
 r = await app.inject({ method: 'OPTIONS', url: '/ev', headers: { origin: 'https://hub.example.ru' } });
 check('CORS разрешает только настроенный origin', r.headers['access-control-allow-origin'] === 'https://hub.example.ru');
 check('CORS поддерживает credentialed beacon mode', r.headers['access-control-allow-credentials'] === 'true');
@@ -89,7 +95,7 @@ r = await get('/export.csv');
 check('/export.csv закрыт без admin token', r.statusCode === 401, `код ${r.statusCode}`);
 r = await get('/export.csv', admin);
 check('/export.csv доступен администратору', r.statusCode === 200 && r.body.startsWith('ts,uid_hash,session_id,game,action,value,sp'));
-check('/export.csv не содержит сырого user_id', !r.body.includes('"555"'));
+check('/export.csv не содержит сырого user_id', !r.body.includes('555'));
 check('/export.csv содержит HMAC подписанного пользователя', r.body.includes(db.hashUid(555)));
 
 r = await post('/forget', { user_id: 555 });

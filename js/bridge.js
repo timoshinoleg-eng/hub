@@ -2,12 +2,30 @@
  * Адаптер MAX Bridge. Все capability-вызовы — через feature detection.
  * initDataUnsafe допустим только для UX/navigation, не для аутентификации.
  */
+const root = () => typeof WebApp !== 'undefined' ? WebApp : (typeof window !== 'undefined' ? window.WebApp : null);
 const get = (path) => {
-  const wa = typeof WebApp !== 'undefined' ? WebApp : (typeof window !== 'undefined' ? window.WebApp : null);
+  const wa = root();
   if (!wa) return undefined;
-  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), wa);
+  try { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), wa); } catch { return undefined; }
 };
 const has = (path) => typeof get(path) === 'function';
+const call = (path, ...args) => {
+  const wa = root();
+  if (!wa) return { ok: false, value: undefined };
+  const parts = path.split('.');
+  let owner = wa;
+  try {
+    for (const part of parts.slice(0, -1)) {
+      owner = owner?.[part];
+      if (owner == null) return { ok: false, value: undefined };
+    }
+    const fn = owner?.[parts[parts.length - 1]];
+    if (typeof fn !== 'function') return { ok: false, value: undefined };
+    return { ok: true, value: fn.apply(owner, args) };
+  } catch {
+    return { ok: false, value: undefined };
+  }
+};
 
 function readStartFromParams(raw) {
   if (!raw) return '';
@@ -16,7 +34,7 @@ function readStartFromParams(raw) {
 }
 
 export const bridge = {
-  available: () => typeof window !== 'undefined' && !!window.WebApp,
+  available: () => !!root(),
 
   /** Подписанная строка. Доверять её полям можно только после server-side HMAC validation. */
   initData: () => {
@@ -38,47 +56,55 @@ export const bridge = {
     return readStartFromParams(typeof location !== 'undefined' ? location.hash : '');
   },
 
-  ready: () => { if (has('ready')) get('ready')(); },
-  expand: () => { if (has('expand')) get('expand')(); },
-  close: () => { if (has('close')) get('close')(); },
+  ready: () => { call('ready'); },
+  expand: () => { call('expand'); },
+  close: () => { call('close'); },
 
   onBack(fn) {
-    const bb = get('BackButton');
-    if (!bb || typeof bb.onClick !== 'function') return () => {};
-    bb.onClick(fn);
-    if (typeof bb.show === 'function') bb.show();
+    if (!call('BackButton.onClick', fn).ok) return () => {};
+    call('BackButton.show');
     return () => {
-      if (typeof bb.offClick === 'function') bb.offClick(fn);
-      if (typeof bb.hide === 'function') bb.hide();
+      call('BackButton.offClick', fn);
+      call('BackButton.hide');
     };
   },
 
   haptic(kind = 'selection') {
-    const h = get('HapticFeedback');
-    if (!h) return;
-    if (kind === 'impact' && typeof h.impactOccurred === 'function') h.impactOccurred('light');
-    else if (kind === 'notify' && typeof h.notificationOccurred === 'function') h.notificationOccurred('success');
-    else if (typeof h.selectionChanged === 'function') h.selectionChanged();
+    if (kind === 'impact') call('HapticFeedback.impactOccurred', 'light');
+    else if (kind === 'notify') call('HapticFeedback.notificationOccurred', 'success');
+    else call('HapticFeedback.selectionChanged');
   },
 
   async share(text, link) {
     const payload = link ? { text, link } : { text };
     if (has('shareMaxContent')) {
-      try { get('shareMaxContent')(payload); return true; } catch { /* fallthrough */ }
+      try {
+        const r = call('shareMaxContent', payload);
+        if (r.ok) { await r.value; return true; }
+      } catch { /* fallthrough */ }
     }
     if (has('shareContent')) {
-      try { get('shareContent')(payload); return true; } catch { /* fallthrough */ }
+      try {
+        const r = call('shareContent', payload);
+        if (r.ok) { await r.value; return true; }
+      } catch { /* fallthrough */ }
     }
     const combined = link ? `${text}\n${link}` : text;
     const maxShareUrl = `https://max.ru/:share?text=${encodeURIComponent(combined)}`;
     if (has('openMaxLink')) {
-      try { get('openMaxLink')(maxShareUrl); return true; } catch { /* fallthrough */ }
+      try {
+        const r = call('openMaxLink', maxShareUrl);
+        if (r.ok) { await r.value; return true; }
+      } catch { /* fallthrough */ }
     }
     if (navigator.share) {
       try { await navigator.share(link ? { text, url: link } : { text }); return true; } catch { /* cancelled */ }
     }
     if (has('openLink')) {
-      try { get('openLink')(maxShareUrl); return true; } catch { /* fallthrough */ }
+      try {
+        const r = call('openLink', maxShareUrl);
+        if (r.ok) { await r.value; return true; }
+      } catch { /* fallthrough */ }
     }
     return false;
   },
@@ -86,14 +112,20 @@ export const bridge = {
   storage: {
     async get(key) {
       if (has('DeviceStorage.getItem')) {
-        try { return JSON.parse(await get('DeviceStorage.getItem')(key)); } catch { /* ignore */ }
+        try {
+          const r = call('DeviceStorage.getItem', key);
+          if (r.ok) return JSON.parse(await r.value);
+        } catch { /* ignore */ }
       }
       try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
     },
     async set(key, value) {
       const raw = JSON.stringify(value);
       if (has('DeviceStorage.setItem')) {
-        try { await get('DeviceStorage.setItem')(key, raw); } catch { /* ignore */ }
+        try {
+          const r = call('DeviceStorage.setItem', key, raw);
+          if (r.ok) await r.value;
+        } catch { /* ignore */ }
       }
       try { localStorage.setItem(key, raw); } catch { /* ignore */ }
     },

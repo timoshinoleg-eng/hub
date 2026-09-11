@@ -2,30 +2,31 @@
  * Регистрация обработчиков MAX-бота. Сеть запускает bot/index.mjs.
  */
 import { Bot, Keyboard } from '@maxhub/max-bot-api';
-import { ORG, SISTER_PROJECTS, WEBAPP_URL, BOT_USERNAME, ADMIN_IDS } from './config.mjs';
+import { ORG, SISTER_PROJECTS, WEBAPP_URL, BOT_USERNAME, ADMIN_IDS, NOTIFICATIONS_ENABLED } from './config.mjs';
 import { GAMES } from '../js/games.js';
 import * as db from '../server/db.mjs';
 
 const LIVE = GAMES.filter((g) => g.enabled);
+const WEB_APP_TARGET = BOT_USERNAME || WEBAPP_URL;
 
 // Fail closed: отсутствие HUB_ADMIN_IDS никого не делает администратором.
 const isAdmin = (uid) => ADMIN_IDS.length > 0 && ADMIN_IDS.includes(Number(uid));
 
-const openAppButton = (text) =>
-  WEBAPP_URL ? Keyboard.button.openApp(text, WEBAPP_URL) : Keyboard.button.openApp(text);
+const openAppButton = (text, payload) =>
+  WEB_APP_TARGET
+    ? Keyboard.button.openApp(text, WEB_APP_TARGET, undefined, payload)
+    : Keyboard.button.openApp(text);
 
 function playButton(g) {
-  if (BOT_USERNAME) return Keyboard.button.link(`${g.emoji} ${g.title}`, `https://max.ru/${BOT_USERNAME}?startapp=g${g.id}`);
-  return openAppButton(`${g.emoji} ${g.title}`);
+  return openAppButton(`${g.emoji} ${g.title}`, `g${g.id}`);
 }
 
 function mainKeyboard() {
   const rows = [
     [openAppButton('🎮 Играть'), Keyboard.button.callback('Во что играть?', 'games')],
-    [Keyboard.button.callback('🔔 Уведомить о запуске', 'notify')],
   ];
+  if (NOTIFICATIONS_ENABLED) rows.push([Keyboard.button.callback('🔔 Уведомить о запуске', 'notify')]);
   const links = [];
-  if (WEBAPP_URL) links.push(Keyboard.button.link('Открыть игротеку', WEBAPP_URL));
   for (const p of SISTER_PROJECTS.slice(0, 2)) links.push(Keyboard.button.link(p.title, p.url));
   if (links.length) rows.push(links.slice(0, 3));
   rows.push([Keyboard.button.callback('Правовая информация', 'legal')]);
@@ -45,14 +46,16 @@ const welcome = (name) =>
   `Сейчас доступны: ${titles}.\n\n` +
   `${ORG.ageRating} · без рекламы и покупок`;
 
-const legalText =
-  `Правовая информация\n\n` +
-  `Оператор: ${ORG.name}, ИНН ${ORG.inn}\n` +
-  `Политика обработки персональных данных: ${ORG.policyUrl}\n` +
-  `Публичная оферта: ${ORG.offerUrl}\n` +
-  `Поддержка: ${ORG.support}\n\n` +
-  `Возрастная маркировка: ${ORG.ageRating}\n` +
-  `Команда /forget — удалить все данные, которые мы о вас храним.`;
+function legalText() {
+  const details = [
+    ORG.name && `Оператор: ${ORG.name}${ORG.inn ? `, ИНН ${ORG.inn}` : ''}`,
+    ORG.policyUrl && `Политика обработки персональных данных: ${ORG.policyUrl}`,
+    ORG.offerUrl && `Публичная оферта: ${ORG.offerUrl}`,
+    ORG.support && `Поддержка: ${ORG.support}`,
+  ].filter(Boolean);
+  if (!details.length) return `Игротека не принимает подписки и не сохраняет данные пользователей.\n\nВозрастная маркировка: ${ORG.ageRating}`;
+  return `Правовая информация\n\n${details.join('\n')}\n\nВозрастная маркировка: ${ORG.ageRating}\nКоманда /forget — удалить все данные, которые мы о вас храним.`;
+}
 
 async function answer(ctx, text, attachments) {
   await ctx.reply(text, attachments ? { attachments } : {});
@@ -92,8 +95,8 @@ export function createBot() {
   });
 
   bot.command('games', async (ctx) => answer(ctx, 'Выберите игру:', [gamesKeyboard()]));
-  bot.command('legal', async (ctx) => answer(ctx, legalText));
-  bot.command('help', async (ctx) => answer(ctx, legalText));
+  bot.command('legal', async (ctx) => answer(ctx, legalText()));
+  bot.command('help', async (ctx) => answer(ctx, legalText()));
 
   bot.command('forget', async (ctx) => {
     if (ctx.user?.user_id) await db.forgetUser(ctx.user.user_id);
@@ -102,9 +105,10 @@ export function createBot() {
 
   bot.action('menu', async (ctx) => answer(ctx, welcome(ctx.user?.first_name), [mainKeyboard()]));
   bot.action('games', async (ctx) => answer(ctx, 'Выберите игру:', [gamesKeyboard()]));
-  bot.action('legal', async (ctx) => answer(ctx, legalText));
+  bot.action('legal', async (ctx) => answer(ctx, legalText()));
 
   bot.action('notify', async (ctx) => {
+    if (!NOTIFICATIONS_ENABLED) return answer(ctx, 'Подписка на обновления пока недоступна.');
     const uid = ctx.user?.user_id;
     if (!uid) return;
     await db.addSubscriber({

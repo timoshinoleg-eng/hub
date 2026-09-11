@@ -11,6 +11,9 @@ const UID = 424242;
 process.env.HUB_JSON_DB = TMP_DB;
 process.env.HUB_HASH_SALT = 'smoke-hash-salt-0123456789abcdef0123456789abcdef';
 process.env.HUB_ADMIN_IDS = String(UID);
+process.env.HUB_NOTIFICATIONS_ENABLED = 'true';
+process.env.HUB_WEBAPP_URL = 'https://games.example.test/hub/';
+process.env.HUB_BOT_USERNAME = 'id100000000000_test_bot';
 rmSync(TMP_DB, { force: true });
 
 const db = await import('../server/db.mjs');
@@ -39,6 +42,8 @@ const run = async (update) => {
 
 const LINK_TYPES = new Set(['link', 'open_app', 'request_contact', 'request_geo_location']);
 const problems = [];
+const validWebAppTarget = (value) =>
+  /^https:\/\//.test(value || '') || /^[A-Za-z0-9_]{3,128}$/.test(value || '');
 function checkKeyboard(label, msgs) {
   for (const m of msgs) {
     for (const att of m.attachments) {
@@ -51,7 +56,7 @@ function checkKeyboard(label, msgs) {
         for (const b of row) {
           if (!b.text) problems.push(`${label}: кнопка без текста (${b.type})`);
           if (b.type === 'link' && !/^https:\/\//.test(b.url || '')) problems.push(`${label}: ссылка не https — ${b.url}`);
-          if (b.type === 'open_app' && b.web_app && !/^https:\/\//.test(b.web_app)) problems.push(`${label}: web_app не https — ${b.web_app}`);
+          if (b.type === 'open_app' && b.web_app && !validWebAppTarget(b.web_app)) problems.push(`${label}: недопустимый web_app — ${b.web_app}`);
         }
       }
     }
@@ -92,6 +97,29 @@ for (const [label, msgs] of cases) {
 
 const results = [];
 const expect = (name, cond, detail = '') => results.push({ name, ok: !!cond, detail });
+const startButtons = cases[0][1]
+  .flatMap((message) => message.attachments)
+  .filter((attachment) => attachment?.type === 'inline_keyboard')
+  .flatMap((attachment) => attachment.payload?.buttons || [])
+  .flat();
+expect(
+  'стартовая клавиатура открывает Mini App по username бота',
+  startButtons.some((button) => button.type === 'open_app' && button.web_app === BOT_USERNAME)
+);
+expect(
+  'стартовая клавиатура не добавляет URL-кнопку',
+  !startButtons.some((button) => button.type === 'link' && button.url === WEBAPP_URL)
+);
+const gameButtons = cases[2][1]
+  .flatMap((message) => message.attachments)
+  .filter((attachment) => attachment?.type === 'inline_keyboard')
+  .flatMap((attachment) => attachment.payload?.buttons || [])
+  .flat();
+expect(
+  'меню игр запускает Mini App без link-кнопок',
+  gameButtons.filter((button) => button.text !== '« Назад')
+    .every((button) => button.type === 'open_app' && button.web_app === BOT_USERNAME)
+);
 const subs = await db.listSubscribers();
 expect('подписчик записан', subs.length === 1 && Number(subs[0].user_id) === UID, `подписчиков: ${subs.length}`);
 const stats = await db.stats();
