@@ -6,8 +6,9 @@
 - Hub PR URL: https://github.com/timoshinoleg-eng/hub/pull/7
 - Hub branch: fix/unified-hub-release-candidate
 - Old Hub SHA (frozen at audit): ef37fac30c977bdb1bf620f6ce22828fe1de4437
-- New Hub SHA (after fixes): cd6d152b50910926e99c3aa0b1e0d881157bf2de
-- Arena branch (session): arena/01a09072-hub at same SHA cd6d152b50910926e99c3aa0b1e0d881157bf2de
+- New Hub SHA (after fixes): 8cc6daa5cea169cd08ecc030660776ec0c06c313
+- Previous Hub SHA (intermediate): cd6d152b50910926e99c3aa0b1e0d881157bf2de
+- Arena branch (session): arena/01a09072-hub at same SHA 8cc6daa5cea169cd08ecc030660776ec0c06c313
 
 ## Quizzzz
 
@@ -191,7 +192,7 @@ explicitly documented and tested.
 
 ## CI and validation after changes
 
-### Hub PR #7 new HEAD cd6d152b50910926e99c3aa0b1e0d881157bf2de
+### Hub PR #7 new HEAD 8cc6daa5cea169cd08ecc030660776ec0c06c313
 
 GitHub Actions (exact-head):
 - smoke: success completed (all sub-checks)
@@ -281,14 +282,14 @@ No production mutation executed. Prepared exact commands for next step (per task
 ```
 
 2. Get immutable digest and new exact Hub HEAD:
-- Hub HEAD: cd6d152b50910926e99c3aa0b1e0d881157bf2de (current)
+- Hub HEAD: 8cc6daa5cea169cd08ecc030660776ec0c06c313 (current, green CI)
 - ImageRef: gitverse.ru/freeveol/quiz-battle@sha256:<digest> (to be obtained after Quizzzz build)
 
 3. Execute ONLY PreflightOnly (do NOT run without separate permission if env has real SSH/production VM access):
 ```powershell
 .\deploy\operator-hub-production.ps1 `
   -ImageRef "gitverse.ru/freeveol/quiz-battle@sha256:<digest>" `
-  -HubSha "cd6d152b50910926e99c3aa0b1e0d881157bf2de" `
+  -HubSha "8cc6daa5cea169cd08ecc030660776ec0c06c313" `
   -CutoverAck "I_UNDERSTAND_THIS_CHANGES_PRODUCTION" `
   -PreflightOnly
 ```
@@ -338,7 +339,7 @@ MUST remain NOT MERGED — verified:
 
 2. After Quizzzz fix, need to rebuild immutable image via publish-hub-image.ps1 and obtain
    gitverse.ru/freeveol/quiz-battle@sha256:<digest>, then run PreflightOnly with
-   HubSha=cd6d152b50910926e99c3aa0b1e0d881157bf2de to prove P0 contract PASS.
+   HubSha=8cc6daa5cea169cd08ecc030660776ec0c06c313 to prove P0 contract PASS.
 
 Hub side is **READY FOR PREFLIGHT** (green CI with new regression coverage):
 - P1 fixed and tested
