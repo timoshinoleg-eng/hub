@@ -50,22 +50,23 @@ export const GAMES = [
     cfg:themed({preventContextMenu:true,preventScroll:true,daily:true}),
   },
   {
-    id:'quiz',title:'Квиз дня',tagline:'10 вопросов на эрудицию',icon:'quiz',enabled:true,unit:'правильных',
-    genre:'ЭРУДИЦИЯ',length:'2–4 мин',accent:'#4d96ff',accent2:'#4ce3e8',
-    howTo:'Выбирай один ответ. В течение дня порядок одинаков для всех.',
-    cfg:themed({preventScroll:true,daily:true}),
+    id:'quiz',title:'Квизик',tagline:'Темы, XP, рейтинг и дуэли',icon:'quiz',enabled:true,unit:'очков',
+    genre:'ЭРУДИЦИЯ',length:'2–5 мин',accent:'#4d96ff',accent2:'#4ce3e8',
+    howTo:'Полноценный Квизик: быстрые игры, квиз дня, рейтинг и дуэли с друзьями.',
+    modulePath:'/quiz/',
+    cfg:themed({preventScroll:true}),
   },
   {
     id:'echo',title:'Эхо',tagline:'Запомни и повтори ритм',icon:'echo',enabled:true,unit:'уровней',
     genre:'ПАМЯТЬ',length:'1–3 мин',accent:'#ff70c8',accent2:'#a76cff',
     howTo:'Смотри на последовательность цветов, затем повторяй её без ошибки.',
-    cfg:themed({preventScroll:true}),
+    cfg:themed({preventScroll:true,daily:true}),
   },
   {
     id:'memory',title:'Пары',tagline:'Найди 8 пар за минимум ходов',icon:'memory',enabled:true,unit:'ходов',
     genre:'ПАМЯТЬ',length:'1–3 мин',accent:'#20cdb6',accent2:'#49a8ff',
     howTo:'Открывай по две карточки и запоминай их позиции. Меньше ходов — лучше.',
-    cfg:themed({preventScroll:true,higherIsBetter:false}),
+    cfg:themed({preventScroll:true,higherIsBetter:false,daily:true}),
   },
 ];
 export const byId=(id)=>GAMES.find((g)=>g.id===id);

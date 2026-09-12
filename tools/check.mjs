@@ -2,10 +2,12 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GAMES as MANIFEST } from '../js/games.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GAMES = join(ROOT, 'games');
 const FORBIDDEN = /\.(png|jpe?g|gif|webp|mp3|wav|ogg|ttf|woff2?)$/i;
+const manifestById = new Map(MANIFEST.map((game) => [game.id, game]));
 let errors = 0;
 let warns = 0;
 const err = (m) => { console.log(`  ✗ ${m}`); errors++; };
@@ -18,7 +20,12 @@ for (const id of readdirSync(GAMES)) {
   const htmlPath = join(dir, 'index.html');
   if (!existsSync(htmlPath)) { err(`${id}: нет index.html`); continue; }
   const html = readFileSync(htmlPath, 'utf8');
-  if (!html.includes('_boot.js')) err(`${id}: не встроен _boot.js`);
+  const manifest = manifestById.get(id);
+  if (manifest?.modulePath) {
+    if (!html.includes('topWindow.location.replace')) err(`${id}: module handoff must replace top window`);
+    if (!html.includes(manifest.modulePath)) err(`${id}: module handoff target mismatch`);
+    if (html.includes('_boot.js')) err(`${id}: module handoff must not boot iframe bridge`);
+  } else if (!html.includes('_boot.js')) err(`${id}: не встроен _boot.js`);
   if (!/<meta[^>]+viewport/i.test(html)) warn(`${id}: нет viewport meta`);
 
   const refs = [...html.matchAll(/(?:src|href)\s*=\s*"([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
@@ -41,6 +48,7 @@ for (const [actual, canonical] of [
   ['games/merge/script.js', 'tools/overrides/merge-script.js'],
   ['games/merge/index.html', 'tools/overrides/merge-index.html'],
   ['games/merge/style.css', 'tools/overrides/merge-style.css'],
+  ['games/quiz/index.html', 'tools/overrides/quiz-index.html'],
   ['games/quiz/script.js', 'tools/overrides/quiz-script.js'],
   ['games/quiz/style.css', 'tools/overrides/quiz-style.css'],
   ['games/reaction/index.html', 'tools/overrides/reaction-index.html'],

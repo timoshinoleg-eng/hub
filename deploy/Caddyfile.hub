@@ -4,6 +4,12 @@
 redir / /hub/ 308
 redir /hub /hub/ 308
 
+redir /quiz /quiz/ 308
+handle_path /quiz/* {
+  header -Server
+  reverse_proxy app:8000
+}
+
 @hub_webhook path /hub/bot/webhook
 handle @hub_webhook {
   request_body {

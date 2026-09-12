@@ -19,7 +19,10 @@ for (const g of GAMES) {
 }
 assert.ok(GAMES.filter((g) => g.cfg?.daily).length >= 2, 'at least two daily-capable games');
 assert.equal(GAMES.find((g) => g.id === 'memory')?.cfg?.higherIsBetter, false, 'memory keeps lower-is-better scoring');
-assert.equal(GAMES.find((g) => g.id === 'quiz')?.tagline, '10 вопросов на эрудицию', 'quiz card matches ten-question runtime');
+const quizGame = GAMES.find((g) => g.id === 'quiz');
+assert.equal(quizGame?.title, 'Квизик', 'catalog exposes the full Quizzzz product');
+assert.equal(quizGame?.modulePath, '/quiz/', 'Quizzzz is mounted as a top-level module');
+assert.equal(quizGame?.cfg?.daily, undefined, 'Quizzzz Daily stays server-authoritative');
 assert.ok(GAMES.every((g) => g.genre !== 'DAILY'), 'game metadata uses Russian genre labels');
 assert.ok(GAMES.some((g) => g.cfg?.injectCss?.includes('.mole::before')), 'reaction target is product-owned CSS visual');
 
@@ -67,10 +70,10 @@ const snake = read('games/snake/script.js');
 assert.ok(snake.includes('while(occupied(x,y))'), 'snake food cannot spawn inside snake');
 assert.ok(!snake.includes('hub-again') && !snake.includes('location.reload'), 'snake uses hub result loop only');
 assert.ok(snake.includes('visibilitychange'), 'snake pauses while hidden');
-const quiz = read('games/quiz/script.js');
-assert.ok(quiz.includes('questionBank.slice(0,10)'), 'daily quiz is intentionally ten questions');
-assert.ok(quiz.includes("button.classList.add('correct')") && quiz.includes("button.classList.add('wrong')"), 'quiz has immediate answer feedback');
-assert.ok(!read('games/quiz/index.html').includes('id="submit"'), 'quiz has no submit-button friction');
+const quizHandoff = read('games/quiz/index.html');
+assert.ok(quizHandoff.includes("new URL('/quiz/'"), 'Hub quiz hands off to full Quizzzz');
+assert.ok(quizHandoff.includes('topWindow.location.replace'), 'Quizzzz escapes the iframe into MAX top window');
+assert.ok(!quizHandoff.includes('../_boot.js'), 'legacy local quiz bridge is no longer user-facing');
 const sapper = read('games/sapper/script.js');
 assert.ok(sapper.includes('aria-pressed') && sapper.includes('opened-count'), 'sapper exposes clear flag mode and progress HUD');
 const merge = read('games/merge/script.js');
