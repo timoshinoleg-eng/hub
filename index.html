@@ -72,11 +72,9 @@
 </div>
 
 <div id="overlay"></div>
-<script>
-  const script = document.createElement('script');
-  script.type = 'module';
-  script.src = 'js/main.js?v=' + encodeURIComponent(window.HUB_ASSET_REVISION || '20260910-1');
-  document.body.appendChild(script);
+<script type="module">
+  const rev = encodeURIComponent(window.HUB_ASSET_REVISION || '20260912-quizzzz');
+  await import(`./js/bootstrap.js?v=${rev}`);
 </script>
 </body>
 </html>

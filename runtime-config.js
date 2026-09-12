@@ -1,4 +1,4 @@
-const HUB_ASSET_REVISION = '20260910-1';
+const HUB_ASSET_REVISION = '20260912-quizzzz';
 
 window.HUB_CONFIG = {
   bot: '',
@@ -15,6 +15,6 @@ window.HUB_ASSET_REVISION = HUB_ASSET_REVISION;
 if (!window.__HUB_DYNAMIC_BOOT__) {
   const script = document.createElement('script');
   script.type = 'module';
-  script.src = `js/main.js?v=${encodeURIComponent(HUB_ASSET_REVISION)}`;
+  script.src = `js/bootstrap.js?v=${encodeURIComponent(HUB_ASSET_REVISION)}`;
   document.head.appendChild(script);
 }
