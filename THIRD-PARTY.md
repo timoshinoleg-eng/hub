@@ -17,6 +17,18 @@ MIT-лицензия на код не подтверждает права на �
 | `quiz` | русский пул вопросов, seeded Fisher–Yates для daily, русские результаты, score/finish → hub |
 | `echo` | русские строки, исправление runtime bug, touch, finish → hub |
 | `memory` | неизвестные PNG удалены и заменены emoji, touch, moves/finish → hub |
+| `sudoku` | убраны внешние favicon/Google Fonts; системный шрифт; score = секунды, finish → hub |
+| `lights` | убраны внешние favicon/Google Fonts; системный шрифт; score = ходы, finish → hub |
+| `nonogram` | убраны внешние favicon/Google Fonts; банк пазлов расширен 11 → 17; score = заполненные клетки, finish → hub |
+| `battleship` | убраны внешние favicon/Google Fonts; score = попадания, finish → hub |
+
+## Игры: `ChanMeng666/html-brick-game`
+
+`brick` взят из MIT-licensed проекта `ChanMeng666/html-brick-game` (Copyright (c) Chan Meng). Текст MIT-лицензии сохраняется при распространении существенных частей кода.
+
+| Игра | Что изменено |
+|---|---|
+| `brick` | удалены OG/schema.org/llms.txt мета и inline «GEO analytics»; удалён блок developer-брендинга с внешними ссылками; Google Fonts @import заменён системным стеком; score/finish → hub; звук — WebAudio без файлов |
 
 `tools/check.mjs` отклоняет внешние `http(s)` runtime-ресурсы в HTML игр. Для критических переписанных файлов используются canonical overrides в `tools/overrides/`, которые повторно применяются после `npm run vendor`.
 
