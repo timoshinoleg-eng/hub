@@ -37,7 +37,7 @@
   let __hubDone = false;
 function hubScore(s) { window.parent.postMessage({ __hub: 1, type: "score", value: s }, "*"); }
 function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.postMessage({ __hub: 1, type: "finish", score: s }, "*"); }
-let __hubHits = 0;
+let __hubShots = 0;
 
 let level = "easy";
   let phase = "level"; // level | placement | combat | result
@@ -466,7 +466,7 @@ let level = "easy";
   }
 
   function showResult(won) {
-    hubFinish(__hubHits);
+    hubFinish(__hubShots);
     phase = "result";
     resultOverlay.classList.remove("hidden");
     if (won) {
@@ -483,7 +483,7 @@ let level = "easy";
 
   function startPlacement() {
     __hubDone = false;
-    __hubHits = 0;
+    __hubShots = 0;
     phase = "placement";
     horizontal = true;
     selectedShipId = FLEET[0].id;
@@ -550,7 +550,8 @@ let level = "easy";
     } else {
       setHud("You sank the enemy " + outcome.ship.name + "!");
     }
-    if (outcome.result !== "miss") { __hubHits++; hubScore(__hubHits); }
+    __hubShots++;
+    hubScore(__hubShots);
     renderBoards();
 
     if (endIfOver()) return;
@@ -593,7 +594,25 @@ let level = "easy";
   }
 
   function tryPlaceAt(r, c) {
-    if (phase !== "placement" || !selectedShipId) return;
+    if (phase !== "placement") return;
+
+    // Тап по уже установленному кораблю снимает его для перестановки.
+    // Mobile-first замена dblclick, который в WebView перехватывается как zoom.
+    const occupiedShipId = playerGrid[r][c];
+    if (occupiedShipId) {
+      removeShip(playerGrid, playerShips, occupiedShipId);
+      selectedShipId = occupiedShipId;
+      hoverCell = null;
+      renderShipTray();
+      renderBoards();
+      const placed = FLEET.find(function (s) {
+        return s.id === occupiedShipId;
+      });
+      setHud("Reposition " + placed.name);
+      return;
+    }
+
+    if (!selectedShipId) return;
     const def = FLEET.find(function (s) {
       return s.id === selectedShipId;
     });
