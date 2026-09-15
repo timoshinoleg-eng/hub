@@ -33,6 +33,11 @@ const GAMES = {
   quiz:     '33-Quiz-Game',
   echo:     '36-Simon-Says-Game',
   memory:   '22-Memory-Card-Game',
+  // Вторая волна (2026-09): тот же пакет, те же правила аудита.
+  sudoku:     '06-Sudoku-Game',
+  lights:     '50-Lights-Out-Game',
+  nonogram:   '49-Nonogram-Game',
+  battleship: '48-Battleship-Game',
 };
 
 /** Что удалить после копирования — чужие ассеты. */
@@ -72,6 +77,17 @@ function __hubRand() {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }`;
+
+// Общие правки второй волны: у всех игр пакета одинаковая шапка
+// (внешний favicon + Google Fonts — запрещены check.mjs).
+const STRIP_EXTERNAL_INDEX = [
+  { file: 'index.html', re: /\s*<link rel="icon"[^>]*>/g, to: '' },
+  { file: 'index.html', re: /\s*<link href="https:\/\/fonts\.googleapis\.com[^>]*>/g, to: '' },
+];
+const SYSTEM_FONT = { file: 'style.css', from: 'font-family: "Outfit", sans-serif;', to: 'font-family: -apple-system, "Segoe UI", Roboto, sans-serif;', all: true };
+const HUB_HELPERS = `let __hubDone = false;
+function hubScore(s) { window.parent.postMessage({ __hub: 1, type: "score", value: s }, "*"); }
+function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.postMessage({ __hub: 1, type: "finish", score: s }, "*"); }`;
 
 const PATCHES = {
   // ── Мердж (2048) ────────────────────────────────────────────────────────
@@ -520,6 +536,284 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
       to: `        back.style.cssText = "display:flex;align-items:center;justify-content:center;font-size:38px;line-height:1";
         card.addEventListener("click", flipCard);
         card.addEventListener("touchstart", (e) => { e.preventDefault(); flipCard({ target: card }); }, { passive: false });`,
+    },
+  ],
+
+  // ── Судоку (Sudoku) ─────────────────────────────────────────────────────
+  // Процедурная генерация, тач-пад уже есть. Счёт — секунды (ниже = лучше).
+  sudoku: [
+    ...STRIP_EXTERNAL_INDEX,
+    SYSTEM_FONT,
+    { file: 'index.html', from: '<title>Talha - Sudoku Game</title>', to: '<title>Sudoku</title>' },
+    {
+      file: 'script.js',
+      from: '  function startTimer() {',
+      to: `  ${HUB_HELPERS}
+
+  function startTimer() {`,
+    },
+    {
+      file: 'script.js',
+      from: '      timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;',
+      to: `      timerEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+      hubScore(sec);`,
+    },
+    {
+      file: 'script.js',
+      from: '    winTimeEl.textContent = "Time: " + timerEl.textContent;',
+      to: `    winTimeEl.textContent = "Time: " + timerEl.textContent;
+    hubFinish(Math.floor((Date.now() - state.startTime) / 1000));`,
+    },
+    {
+      file: 'script.js',
+      from: '  function startGame(level) {',
+      to: `  function startGame(level) {
+    __hubDone = false;`,
+    },
+  ],
+
+  // ── Гаси свет (Lights Out) ──────────────────────────────────────────────
+  // Счёт — ходы (ниже = лучше). Генерация всегда решаемых раскладок.
+  lights: [
+    ...STRIP_EXTERNAL_INDEX,
+    SYSTEM_FONT,
+    { file: 'index.html', from: '<title>Talha - Lights Out Game</title>', to: '<title>Lights Out</title>' },
+    {
+      file: 'script.js',
+      from: '  let level = "easy";',
+      to: `  ${HUB_HELPERS}
+
+  let level = "easy";`,
+    },
+    {
+      file: 'script.js',
+      from: `    moves += 1;
+    render();`,
+      to: `    moves += 1;
+    hubScore(moves);
+    render();`,
+    },
+    {
+      file: 'script.js',
+      from: `      won = true;
+      $("#resultTitle").textContent = "You win!";`,
+      to: `      won = true;
+      hubFinish(moves);
+      $("#resultTitle").textContent = "You win!";`,
+    },
+    {
+      file: 'script.js',
+      from: `    moves = 0;
+    won = false;`,
+      to: `    moves = 0;
+    won = false;
+    __hubDone = false;`,
+    },
+  ],
+
+  // ── Нонограммы (Nonogram) ───────────────────────────────────────────────
+  // Тач (long-press + вибрация) уже есть. Счёт — заполненные клетки.
+  // Банк пазлов расширен: easy +2, medium +2, hard +1 (16 вместо 11).
+  nonogram: [
+    ...STRIP_EXTERNAL_INDEX,
+    SYSTEM_FONT,
+    { file: 'index.html', from: '<title>Talha - Nonogram Game</title>', to: '<title>Nonogram</title>' },
+    {
+      file: 'script.js',
+      from: '  let currentLevel = "easy";',
+      to: `  ${HUB_HELPERS}
+
+  let currentLevel = "easy";`,
+    },
+    {
+      file: 'script.js',
+      from: '    els.hudProgress.textContent = `${filled} / ${target}`;',
+      to: `    els.hudProgress.textContent = \`\${filled} / \${target}\`;
+    hubScore(filled);`,
+    },
+    {
+      file: 'script.js',
+      from: `  function showWin() {
+    won = true;`,
+      to: `  function showWin() {
+    won = true;
+    hubFinish(countFilled(solution));`,
+    },
+    {
+      file: 'script.js',
+      from: `  function startGame(levelKey, newPuzzle) {
+    currentLevel = levelKey;`,
+      to: `  function startGame(levelKey, newPuzzle) {
+    __hubDone = false;
+    currentLevel = levelKey;`,
+    },
+    {
+      file: 'script.js',
+      from: `      // Arrow up
+      [
+        [0, 0, 1, 0, 0],
+        [0, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1],
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0],
+      ],
+    ],`,
+      to: `      // Arrow up
+      [
+        [0, 0, 1, 0, 0],
+        [0, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1],
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0],
+      ],
+      // Diamond
+      [
+        [0, 0, 1, 0, 0],
+        [0, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1],
+        [0, 1, 1, 1, 0],
+        [0, 0, 1, 0, 0],
+      ],
+      // Cross X
+      [
+        [1, 0, 0, 0, 1],
+        [0, 1, 0, 1, 0],
+        [0, 0, 1, 0, 0],
+        [0, 1, 0, 1, 0],
+        [1, 0, 0, 0, 1],
+      ],
+    ],`,
+    },
+    {
+      file: 'script.js',
+      from: `      // Anchor
+      [
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+        [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+        [0, 1, 1, 0, 1, 1, 0, 1, 1, 0],
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+      ],
+    ],`,
+      to: `      // Anchor
+      [
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 1, 0, 0, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [1, 0, 0, 0, 1, 1, 0, 0, 0, 1],
+        [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+        [0, 1, 1, 0, 1, 1, 0, 1, 1, 0],
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+      ],
+      // Heart big
+      [
+        [0, 1, 1, 0, 0, 1, 1, 0, 0, 0],
+        [1, 1, 1, 1, 0, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      ],
+      // Umbrella
+      [
+        [0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+        [0, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
+        [0, 1, 1, 0, 1, 1, 0, 0, 0, 0],
+      ],
+    ],`,
+    },
+    {
+      file: 'script.js',
+      from: `        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+      ],
+    ],
+  };`,
+      to: `        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+      ],
+      // Star
+      [
+        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+        [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+        [0, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0],
+        [0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0],
+        [1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0],
+        [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0],
+        [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+      ],
+    ],
+  };`,
+    },
+  ],
+
+  // ── Морской бой (Battleship) ────────────────────────────────────────────
+  // ИИ трёх уровней (hunt+parity). Счёт — попадания игрока.
+  battleship: [
+    ...STRIP_EXTERNAL_INDEX,
+    SYSTEM_FONT,
+    { file: 'index.html', from: '<title>Talha - Battleship Game</title>', to: '<title>Battleship</title>' },
+    {
+      file: 'script.js',
+      from: 'let level = "easy";',
+      to: `${HUB_HELPERS}
+let __hubHits = 0;
+
+let level = "easy";`,
+    },
+    {
+      file: 'script.js',
+      from: `  function startPlacement() {
+    phase = "placement";`,
+      to: `  function startPlacement() {
+    __hubDone = false;
+    __hubHits = 0;
+    phase = "placement";`,
+    },
+    {
+      file: 'script.js',
+      from: `      setHud("You sank the enemy " + outcome.ship.name + "!");
+    }
+    renderBoards();`,
+      to: `      setHud("You sank the enemy " + outcome.ship.name + "!");
+    }
+    if (outcome.result !== "miss") { __hubHits++; hubScore(__hubHits); }
+    renderBoards();`,
+    },
+    {
+      file: 'script.js',
+      from: `  function showResult(won) {
+    phase = "result";`,
+      to: `  function showResult(won) {
+    hubFinish(__hubHits);
+    phase = "result";`,
     },
   ],
 };

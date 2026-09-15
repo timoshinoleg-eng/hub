@@ -116,7 +116,7 @@ npm run check
 
 ## Доступные игры
 
-Текущий manifest содержит семь включённых игр: Merge, Reaction, Snake, Sapper, Quiz, Echo и Memory. Перед публичным релизом каждая включённая игра должна пройти ручной smoke на целевых смартфонах/MAX WebView; `enabled: false` используется для игры, которая не прошла acceptance.
+Текущий manifest содержит двенадцать включённых игр: Merge, Reaction, Snake, Sapper, Quiz, Echo, Memory, Sudoku, Lights, Nonogram, Battleship и Brick. Перед публичным релизом каждая включённая игра должна пройти ручной smoke на целевых смартфонах/MAX WebView; `enabled: false` используется для игры, которая не прошла acceptance.
 
 ## Deploy checklist
 

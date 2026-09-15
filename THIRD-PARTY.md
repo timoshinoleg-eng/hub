@@ -2,7 +2,7 @@
 
 ## Игры: `he-is-talha/html-css-javascript-games`
 
-Исходный код игр взят из MIT-licensed проекта `he-is-talha/html-css-javascript-games`. Текст MIT-лицензии и copyright notice должны сохраняться при распространении существенных частей исходного кода.
+Исходный код игр взят из MIT-licensed проекта `he-is-talha/html-css-javascript-games`. Текст MIT-лицензии и copyright notice должны сохраняться при распространении существенных частей исходного кода. Полный текст лицензии: [`licenses/he-is-talha-MIT.txt`](licenses/he-is-talha-MIT.txt).
 
 MIT-лицензия на код не подтверждает права на сторонние изображения, аудио, шрифты, товарные знаки или узнаваемые чужие игровые бренды. Поэтому production-пайплайн не должен включать внешние/непроверенные runtime-ассеты из vendored games.
 
@@ -17,6 +17,18 @@ MIT-лицензия на код не подтверждает права на �
 | `quiz` | русский пул вопросов, seeded Fisher–Yates для daily, русские результаты, score/finish → hub |
 | `echo` | русские строки, исправление runtime bug, touch, finish → hub |
 | `memory` | неизвестные PNG удалены и заменены emoji, touch, moves/finish → hub |
+| `sudoku` | убраны внешние favicon/Google Fonts; системный шрифт; score = секунды, finish → hub |
+| `lights` | убраны внешние favicon/Google Fonts; системный шрифт; score = ходы, finish → hub |
+| `nonogram` | убраны внешние favicon/Google Fonts; банк пазлов расширен 11 → 17; score = секунды, finish → hub |
+| `battleship` | убраны внешние favicon/Google Fonts; score = выстрелы, finish → hub |
+
+## Игры: `ChanMeng666/html-brick-game`
+
+`brick` взят из MIT-licensed проекта `ChanMeng666/html-brick-game` (Copyright (c) 2026 Chan Meng). Текст MIT-лицензии сохраняется при распространении существенных частей кода. Полный текст лицензии: [`licenses/html-brick-game-MIT.txt`](licenses/html-brick-game-MIT.txt).
+
+| Игра | Что изменено |
+|---|---|
+| `brick` | удалены OG/schema.org/llms.txt мета и inline «GEO analytics»; удалён блок developer-брендинга с внешними ссылками; Google Fonts @import заменён системным стеком; score/finish → hub; звук — WebAudio без файлов |
 
 `tools/check.mjs` отклоняет внешние `http(s)` runtime-ресурсы в HTML игр. Для критических переписанных файлов используются canonical overrides в `tools/overrides/`, которые повторно применяются после `npm run vendor`.
 

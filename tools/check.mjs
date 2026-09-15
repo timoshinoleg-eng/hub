@@ -41,6 +41,17 @@ for (const id of readdirSync(GAMES)) {
     const css = readFileSync(join(dir, name), 'utf8');
     if (/(?:@import\s+[^;]*https?:\/\/|url\(\s*["']?https?:\/\/)/i.test(css)) err(`${id}/${name}: внешний CSS runtime-ресурс запрещён`);
   }
+
+  // JS сканируем на внешние network-вызовы: fetch/XHR/WebSocket/EventSource,
+  // динамические import() и new Image('https://...'). Строки в комментариях допустимы.
+  const JS_NETWORK = /(?:\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\b|\bEventSource\b|\bimport\s*\(\s*['"`]https?:|\bnew\s+Image\s*\(\s*['"`]https?:|\b(?:src|href)\s*=\s*['"`]https?:)/;
+  for (const name of readdirSync(dir).filter((f) => f.endsWith('.js'))) {
+    const js = readFileSync(join(dir, name), 'utf8');
+    const withoutComments = js
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    if (JS_NETWORK.test(withoutComments)) err(`${id}/${name}: внешний network-вызов в JS запрещён`);
+  }
   console.log(`  ok ${id}`);
 }
 

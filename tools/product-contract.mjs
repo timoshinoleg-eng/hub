@@ -8,7 +8,7 @@ import { GAMES } from '../js/games.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
-assert.equal(GAMES.length, 7, 'release scope remains seven games');
+assert.equal(GAMES.length, 12, 'release scope is twelve games after wave 2');
 assert.ok(GAMES.every((g) => g.enabled), 'all release games must be explicitly enabled');
 for (const g of GAMES) {
   assert.ok(g.accent && g.accent2, `${g.id}: visual accent metadata`);
@@ -79,5 +79,28 @@ assert.ok(sapper.includes('aria-pressed') && sapper.includes('opened-count'), 's
 const merge = read('games/merge/script.js');
 assert.ok(merge.includes("cell.textContent=v?String(v):''"), 'merge empty cells are visually empty');
 assert.ok(merge.includes("Math.random()<.9?2:4"), 'merge spawns standard 2/4 tiles');
+
+// Волна 2: пять новых игр.
+const sudoku = read('games/sudoku/script.js');
+assert.ok(sudoku.includes('hubFinish') && sudoku.includes('hubScore(sec)'), 'sudoku reports seconds score and finish');
+assert.ok(sudoku.includes('LEVEL_CONFIG'), 'sudoku keeps three difficulty levels');
+assert.ok(sudoku.includes('countSolutions'), 'sudoku guarantees unique puzzle solutions');
+assert.ok(!/checkBox: false/.test(sudoku), 'sudoku validates 2x2 boxes on easy too');
+const lights = read('games/lights/script.js');
+assert.ok(lights.includes('hubFinish(moves)') && lights.includes('generatePuzzle'), 'lights reports moves and generates solvable boards');
+const nonogram = read('games/nonogram/script.js');
+assert.ok(nonogram.includes('hubFinish(elapsedSec())'), 'nonogram reports elapsed seconds on win');
+assert.ok(nonogram.includes('lastLongPressAt'), 'nonogram guards long-press vs contextmenu double toggle');
+assert.ok((nonogram.match(/\/\/ (Heart|Plus|Frame|Arrow|Diamond|Cross|House|Tree|Cat|Anchor|Umbrella|Sailboat|Fish|Castle|Smiley|Star)/g) || []).length >= 16, 'nonogram puzzle bank expanded');
+const battleship = read('games/battleship/script.js');
+assert.ok(battleship.includes('pickParityCell'), 'battleship keeps AI levels');
+assert.ok(battleship.includes('__hubShots++'), 'battleship reports player shots as score');
+assert.ok(battleship.includes('occupiedShipId'), 'battleship allows tap-to-remove placed ship');
+const brick = read('games/brick/game.js');
+assert.ok(brick.includes('hubFinish(score)') && brick.includes('touchMoveHandler'), 'brick reports score/finish and keeps touch controls');
+assert.ok(brick.includes('layoutBricks'), 'brick scales brick geometry to canvas width');
+assert.ok(brick.includes('canvas.addEventListener("touchstart"'), 'brick listens touch on canvas only');
+assert.ok(!brick.includes('document.addEventListener("touchstart"'), 'brick must not swallow global touchstart');
+assert.ok(!brick.includes('confirm('), 'brick must not rely on confirm (stubbed by _boot.js)');
 
 console.log('product/playability contract: ok');

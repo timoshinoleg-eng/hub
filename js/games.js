@@ -68,6 +68,36 @@ export const GAMES = [
     howTo:'Открывай по две карточки и запоминай их позиции. Меньше ходов — лучше.',
     cfg:themed({preventScroll:true,higherIsBetter:false,daily:true}),
   },
+  {
+    id:'sudoku',title:'Судоку',tagline:'4×4, 6×6 и настоящие 9×9',icon:'sudoku',enabled:true,unit:'сек',
+    genre:'ЛОГИКА',length:'3–10 мин',accent:'#ffd166',accent2:'#ff9f58',
+    howTo:'Тап по клетке, затем цифра на панели. Заполни всё поле без повторов.',
+    cfg:themed({preventScroll:true,higherIsBetter:false}),
+  },
+  {
+    id:'lights',title:'Гаси свет',tagline:'Погаси все лампочки',icon:'lights',enabled:true,unit:'ходов',
+    genre:'ЛОГИКА',length:'1–3 мин',accent:'#f9f871',accent2:'#ffb44c',
+    howTo:'Тап по клетке переключает её и соседей. Погаси всё поле за минимум ходов.',
+    cfg:themed({preventScroll:true,higherIsBetter:false}),
+  },
+  {
+    id:'nonogram',title:'Нонограммы',tagline:'Разгадай картинку по цифрам',icon:'nonogram',enabled:true,unit:'сек',
+    genre:'ЛОГИКА',length:'3–15 мин',accent:'#7ae0ff',accent2:'#4d96ff',
+    howTo:'Цифры у рядов и колонок — длины закрашенных блоков. Тап — закрасить, долгий тап — крестик.',
+    cfg:themed({preventScroll:true,higherIsBetter:false}),
+  },
+  {
+    id:'battleship',title:'Морской бой',tagline:'Потопи флот ИИ',icon:'battleship',enabled:true,unit:'выстрелов',
+    genre:'СТРАТЕГИЯ',length:'5–10 мин',accent:'#58c4dc',accent2:'#2f80ed',
+    howTo:'Расставь корабли и стреляй по полю противника. Три уровня ИИ.',
+    cfg:themed({preventScroll:true,higherIsBetter:false}),
+  },
+  {
+    id:'brick',title:'Кирпичи',tagline:'Разбей все блоки звездой',icon:'brick',enabled:true,unit:'очков',
+    genre:'АРКАДА',length:'2–6 мин',accent:'#ff9f58',accent2:'#ff5f7e',
+    howTo:'Веди пальцем платформу, отбивай звезду и разбивай кирпичи. Три жизни.',
+    cfg:themed({preventScroll:true}),
+  },
 ];
 export const byId=(id)=>GAMES.find((g)=>g.id===id);
 export const visible=(showAll)=>GAMES.filter((g)=>showAll||g.enabled);
