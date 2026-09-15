@@ -370,7 +370,7 @@ function collisionDetection() {
                     if (score == brickRowCount * brickColumnCount) {
                         playVictorySound();  // 播放胜利音效
                         saveHighScore(score);
-                        hubFinish(score);
+                        hubFinish(score);  // 保存高分
                         gameState = 'menu';
                         backgroundMusicPlaying = false;
                         showMessage("🎉 Victory! 🎉", () => {
@@ -654,7 +654,7 @@ function draw() {
             } else {
                 playGameOverSound();  // 播放游戏结束音效
                 saveHighScore(score);
-                        hubFinish(score);
+                hubFinish(score);  // 保存高分
                 gameState = 'menu';
                 backgroundMusicPlaying = false;
                 showMessage("💀 Game Over!", () => {
