@@ -4,7 +4,7 @@
   // Level: grid size, box dimensions, and clue count range
   // Easy: no box/region check (row + column only); Medium/Hard: full Sudoku with boxes
   const LEVEL_CONFIG = {
-    easy:   { size: 4, boxRows: 2, boxCols: 2, cluesMin: 8,  cluesMax: 10, checkBox: false },
+    easy:   { size: 4, boxRows: 2, boxCols: 2, cluesMin: 8,  cluesMax: 10, checkBox: true },
     medium: { size: 6, boxRows: 2, boxCols: 3, cluesMin: 18, cluesMax: 22, checkBox: true },
     hard:   { size: 9, boxRows: 3, boxCols: 3, cluesMin: 25, cluesMax: 28, checkBox: true },
   };
@@ -16,7 +16,7 @@
     size: 4,
     boxRows: 2,
     boxCols: 2,
-    checkBox: false,  // easy: row+column only; medium/hard: also box
+    checkBox: true,  // блоки проверяются на всех уровнях (в т.ч. 2×2 в easy)
     solution: null,
     puzzle: null,
     given: null,
@@ -87,6 +87,29 @@
     return indices;
   }
 
+  // Считает число решений сетки (0 — пустая клетка), останавливаясь на limit
+  function countSolutions(grid, size, boxRows, boxCols, checkBox, limit) {
+    let count = 0;
+    (function dfs() {
+      if (count >= limit) return;
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          if (grid[r][c] !== 0) continue;
+          for (let num = 1; num <= size; num++) {
+            if (!isValid(grid, r, c, num, size, boxRows, boxCols, checkBox)) continue;
+            grid[r][c] = num;
+            dfs();
+            grid[r][c] = 0;
+            if (count >= limit) return;
+          }
+          return;
+        }
+      }
+      count++;
+    })();
+    return count;
+  }
+
   function createPuzzle(level) {
     const { size, boxRows, boxCols, cluesMin, cluesMax, checkBox } = LEVEL_CONFIG[level];
     const solution = generateFullGrid(size, boxRows, boxCols, checkBox);
@@ -96,10 +119,18 @@
     const puzzle = solution.map((row) => row.slice());
     const given = puzzle.map((row) => row.map(() => false));
     const indices = getShuffledIndices(size);
-    for (let k = 0; k < toRemove; k++) {
+    // Удаляем клетку только если головоломка сохраняет ровно одно решение
+    let removed = 0;
+    for (let k = 0; k < indices.length && removed < toRemove; k++) {
       const { r, c } = indices[k];
+      const backup = puzzle[r][c];
       puzzle[r][c] = null;
-      given[r][c] = false;
+      const test = puzzle.map((row) => row.map((v) => (v === null ? 0 : v)));
+      if (countSolutions(test, size, boxRows, boxCols, checkBox, 2) === 1) {
+        removed++;
+      } else {
+        puzzle[r][c] = backup;
+      }
     }
     for (let r = 0; r < size; r++)
       for (let c = 0; c < size; c++)
@@ -148,10 +179,10 @@
       if (r !== row && grid[r][col] === num) same.push(flatIndex(r, col));
     }
     if (state.checkBox && state.boxRows > 0 && state.boxCols > 0) {
-      const br = Math.floor(row / state.boxRows) * state.boxRows;
-      const bc = Math.floor(col / state.boxCols) * state.boxCols;
-      for (let r = br; r < br + state.boxRows; r++) {
-        for (let c = bc; c < bc + state.boxCols; c++) {
+      const br = Math.floor(row / boxRows) * boxRows;
+      const bc = Math.floor(col / boxCols) * boxCols;
+      for (let r = br; r < br + boxRows; r++) {
+        for (let c = bc; c < bc + boxCols; c++) {
           if ((r !== row || c !== col) && grid[r][c] === num)
             same.push(flatIndex(r, c));
         }
