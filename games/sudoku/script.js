@@ -179,10 +179,10 @@
       if (r !== row && grid[r][col] === num) same.push(flatIndex(r, col));
     }
     if (state.checkBox && state.boxRows > 0 && state.boxCols > 0) {
-      const br = Math.floor(row / boxRows) * boxRows;
-      const bc = Math.floor(col / boxCols) * boxCols;
-      for (let r = br; r < br + boxRows; r++) {
-        for (let c = bc; c < bc + boxCols; c++) {
+      const br = Math.floor(row / state.boxRows) * state.boxRows;
+      const bc = Math.floor(col / state.boxCols) * state.boxCols;
+      for (let r = br; r < br + state.boxRows; r++) {
+        for (let c = bc; c < bc + state.boxCols; c++) {
           if ((r !== row || c !== col) && grid[r][c] === num)
             same.push(flatIndex(r, c));
         }
