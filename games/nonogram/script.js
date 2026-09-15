@@ -254,7 +254,13 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
   let won = false;
   let longPressTimer = null;
   let longPressFired = false;
+  let lastLongPressAt = 0;
   let touchStart = null;
+  let startTime = null;
+
+  function elapsedSec() {
+    return startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
+  }
 
   const els = {
     levelScreen: document.getElementById("levelScreen"),
@@ -350,7 +356,7 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
       }
     }
     els.hudProgress.textContent = `${filled} / ${target}`;
-    hubScore(filled);
+    hubScore(elapsedSec());
   }
 
   function checkWin() {
@@ -365,7 +371,7 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
 
   function showWin() {
     won = true;
-    hubFinish(countFilled(solution));
+    hubFinish(elapsedSec());
     els.statusText.textContent = "Puzzle complete!";
     els.statusText.classList.add("win");
     els.resultTitle.textContent = "You win!";
@@ -426,6 +432,9 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
 
     el.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      // На WebView contextmenu приходит после long-press: метка уже выставлена
+      // touch-таймером — не переключаем клетку второй раз.
+      if (Date.now() - lastLongPressAt < 700) return;
       toggleMark(r, c);
     });
 
@@ -439,6 +448,7 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
         clearLongPress();
         longPressTimer = setTimeout(() => {
           longPressFired = true;
+          lastLongPressAt = Date.now();
           toggleMark(r, c);
           if (navigator.vibrate) navigator.vibrate(20);
         }, LONG_PRESS_MS);
@@ -531,6 +541,7 @@ function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.p
 
   function startGame(levelKey, newPuzzle) {
     __hubDone = false;
+    startTime = Date.now();
     currentLevel = levelKey;
     const cfg = LEVELS[levelKey];
     size = cfg.size;
