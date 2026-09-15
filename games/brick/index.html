@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Starlight Breaker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- Start menu -->
+    <div id="startMenu" class="menu active">
+        <div class="menu-content">
+            <h1>🌟 STARLIGHT BREAKER</h1>
+            <p class="subtitle">An Artistic Brick Breaking Experience</p>
+            <button id="startGameBtn" class="menu-button">START GAME</button>
+            <button id="instructionsBtn" class="menu-button">INSTRUCTIONS</button>
+            <button id="highScoreBtn" class="menu-button">HIGH SCORES</button>
+        </div>
+    </div>
+
+    <!-- In-game UI -->
+    <div id="gameMenu">
+        <div class="game-ui">
+            <button id="pauseBtn" class="ui-button">⏸️ PAUSE</button>
+            <button id="menuBtn" class="ui-button">🏠 MENU</button>
+        </div>
+    </div>
+
+    <!-- Instructions -->
+    <div id="instructionsMenu" class="menu">
+        <div class="menu-content">
+            <h2>🎮 HOW TO PLAY</h2>
+            <div class="instructions">
+                <p>🖱️ Move your mouse to control the deer paddle</p>
+                <p>📱 On mobile: Touch and drag to move the paddle</p>
+                <p>⭐ Bounce the star ball to break all bricks</p>
+                <p>💖 You have 3 lives - don't let the ball fall!</p>
+                <p>🎯 Clear all bricks to win the game</p>
+                <p>⌨️ Press ESC to pause/resume the game</p>
+            </div>
+            <button id="backToMenuBtn" class="menu-button">BACK TO MENU</button>
+        </div>
+    </div>
+
+    <!-- High scores -->
+    <div id="highScoreMenu" class="menu">
+        <div class="menu-content">
+            <h2>🏆 HIGH SCORES</h2>
+            <div id="highScoreList" class="high-score-list"></div>
+            <button id="clearScoresBtn" class="menu-button secondary">CLEAR SCORES</button>
+            <button id="backToMenuFromScoresBtn" class="menu-button">BACK TO MENU</button>
+        </div>
+    </div>
+
+    <!-- Pause menu -->
+    <div id="pauseMenu" class="menu">
+        <div class="menu-content">
+            <h2>⏸️ GAME PAUSED</h2>
+            <button id="resumeBtn" class="menu-button">RESUME</button>
+            <button id="restartBtn" class="menu-button">RESTART</button>
+            <button id="backToMainMenuBtn" class="menu-button">MAIN MENU</button>
+        </div>
+    </div>
+
+    <!-- Pop-up message -->
+    <div id="messageBox" class="hidden">
+        <div id="messageContent">
+            <p id="messageText"></p>
+            <button id="messageButton">Yes</button>
+        </div>
+    </div>
+
+    <!-- Landscape hint -->
+    <div id="orientationWarning" class="orientation-warning hidden">
+        <div class="orientation-content">
+            <div class="orientation-icon">📱 ↻</div>
+            <h3>Please Rotate Your Device</h3>
+            <p>For the best gaming experience, please use landscape mode</p>
+        </div>
+    </div>
+
+    <!-- Touch guide (first run) -->
+    <div id="touchGuide" class="touch-guide hidden">
+        <div class="touch-guide-content">
+            <h3>👆 Touch Controls</h3>
+            <p>Touch and drag anywhere on the screen to move the paddle</p>
+            <button id="touchGuideBtn" class="menu-button">Got it!</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+<script src="../_boot.js" data-game="brick"></script>
+</body>
+</html>
