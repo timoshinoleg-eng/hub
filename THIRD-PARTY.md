@@ -2,7 +2,7 @@
 
 ## Игры: `he-is-talha/html-css-javascript-games`
 
-Исходный код игр взят из MIT-licensed проекта `he-is-talha/html-css-javascript-games`. Текст MIT-лицензии и copyright notice должны сохраняться при распространении существенных частей исходного кода.
+Исходный код игр взят из MIT-licensed проекта `he-is-talha/html-css-javascript-games`. Текст MIT-лицензии и copyright notice должны сохраняться при распространении существенных частей исходного кода. Полный текст лицензии: [`licenses/he-is-talha-MIT.txt`](licenses/he-is-talha-MIT.txt).
 
 MIT-лицензия на код не подтверждает права на сторонние изображения, аудио, шрифты, товарные знаки или узнаваемые чужие игровые бренды. Поэтому production-пайплайн не должен включать внешние/непроверенные runtime-ассеты из vendored games.
 
@@ -19,12 +19,12 @@ MIT-лицензия на код не подтверждает права на �
 | `memory` | неизвестные PNG удалены и заменены emoji, touch, moves/finish → hub |
 | `sudoku` | убраны внешние favicon/Google Fonts; системный шрифт; score = секунды, finish → hub |
 | `lights` | убраны внешние favicon/Google Fonts; системный шрифт; score = ходы, finish → hub |
-| `nonogram` | убраны внешние favicon/Google Fonts; банк пазлов расширен 11 → 17; score = заполненные клетки, finish → hub |
-| `battleship` | убраны внешние favicon/Google Fonts; score = попадания, finish → hub |
+| `nonogram` | убраны внешние favicon/Google Fonts; банк пазлов расширен 11 → 17; score = секунды, finish → hub |
+| `battleship` | убраны внешние favicon/Google Fonts; score = выстрелы, finish → hub |
 
 ## Игры: `ChanMeng666/html-brick-game`
 
-`brick` взят из MIT-licensed проекта `ChanMeng666/html-brick-game` (Copyright (c) Chan Meng). Текст MIT-лицензии сохраняется при распространении существенных частей кода.
+`brick` взят из MIT-licensed проекта `ChanMeng666/html-brick-game` (Copyright (c) 2026 Chan Meng). Текст MIT-лицензии сохраняется при распространении существенных частей кода. Полный текст лицензии: [`licenses/html-brick-game-MIT.txt`](licenses/html-brick-game-MIT.txt).
 
 | Игра | Что изменено |
 |---|---|

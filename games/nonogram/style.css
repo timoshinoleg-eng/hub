@@ -132,6 +132,7 @@ body {
 
 .game-screen.size-15 {
   max-width: 900px;
+  overflow-x: auto;
 }
 
 .header {
@@ -447,7 +448,8 @@ body {
   }
 
   .board.size-15 {
-    --cell-size: 16px;
+    /* Не опускаемся ниже touch-friendly размера: лишнее ширина добираем скроллом */
+    --cell-size: 22px;
   }
 
   .board.size-15 .col-clues {

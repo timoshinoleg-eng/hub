@@ -81,16 +81,16 @@ export const GAMES = [
     cfg:themed({preventScroll:true,higherIsBetter:false}),
   },
   {
-    id:'nonogram',title:'Нонограммы',tagline:'Разгадай картинку по цифрам',icon:'nonogram',enabled:true,unit:'клеток',
+    id:'nonogram',title:'Нонограммы',tagline:'Разгадай картинку по цифрам',icon:'nonogram',enabled:true,unit:'сек',
     genre:'ЛОГИКА',length:'3–15 мин',accent:'#7ae0ff',accent2:'#4d96ff',
     howTo:'Цифры у рядов и колонок — длины закрашенных блоков. Тап — закрасить, долгий тап — крестик.',
-    cfg:themed({preventScroll:true}),
+    cfg:themed({preventScroll:true,higherIsBetter:false}),
   },
   {
-    id:'battleship',title:'Морской бой',tagline:'Потопи флот ИИ',icon:'battleship',enabled:true,unit:'попаданий',
+    id:'battleship',title:'Морской бой',tagline:'Потопи флот ИИ',icon:'battleship',enabled:true,unit:'выстрелов',
     genre:'СТРАТЕГИЯ',length:'5–10 мин',accent:'#58c4dc',accent2:'#2f80ed',
     howTo:'Расставь корабли и стреляй по полю противника. Три уровня ИИ.',
-    cfg:themed({preventScroll:true}),
+    cfg:themed({preventScroll:true,higherIsBetter:false}),
   },
   {
     id:'brick',title:'Кирпичи',tagline:'Разбей все блоки звездой',icon:'brick',enabled:true,unit:'очков',
