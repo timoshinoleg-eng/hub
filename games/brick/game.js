@@ -93,6 +93,9 @@ function resizeCanvas() {
     canvas.width = size.width;
     canvas.height = size.height;
 
+    // Пересчитываем геометрию кирпичей/платформы под новый размер
+    layoutBricks();
+
     // 如果游戏正在进行，需要重新缩放游戏元素
     if (gameState === 'playing' && oldWidth !== size.width) {
         const scaleX = size.width / oldWidth;
@@ -125,14 +128,9 @@ function checkOrientation() {
     const orientationWarning = document.getElementById('orientationWarning');
     if (!orientationWarning) return;
 
-    const isPortrait = window.innerHeight > window.innerWidth;
-
-    if (isPortrait && isSmallScreen()) {
-        // 竖屏且是小屏幕设备，显示提示
-        orientationWarning.classList.remove('hidden');
-    } else {
-        orientationWarning.classList.add('hidden');
-    }
+    // Геометрия масштабируется под любую ширину (layoutBricks),
+    // поэтому portrait не блокируем — предупреждение больше не показываем.
+    orientationWarning.classList.add('hidden');
 }
 
 // 触摸指引管理
@@ -248,11 +246,26 @@ let leftPressed = false;
 
 const brickRowCount = 5;
 const brickColumnCount = 9;
-const brickWidth = 75;
-const brickHeight = 20;
-const brickPadding = 10;
-const brickOffsetTop = 30;
-const brickOffsetLeft = 30;
+// Геометрия вычисляется от ширины canvas (layoutBricks), чтобы всё поле
+// помещалось на мобильном экране и каждый кирпич был достижим для мяча.
+let brickWidth = 75;
+let brickHeight = 20;
+let brickPadding = 10;
+let brickOffsetTop = 30;
+let brickOffsetLeft = 30;
+
+function layoutBricks() {
+    const w = canvas.width;
+    const h = canvas.height;
+    brickPadding = Math.max(4, Math.round(w * 0.012));
+    const side = Math.max(8, Math.round(w * 0.04));
+    brickOffsetLeft = side;
+    brickWidth = (w - side * 2 - (brickColumnCount - 1) * brickPadding) / brickColumnCount;
+    brickHeight = Math.max(14, Math.min(24, Math.round(h * 0.035)));
+    brickOffsetTop = Math.max(24, Math.round(h * 0.06));
+    paddleWidth = Math.max(48, Math.round(w * 0.2));
+    paddleX = Math.max(0, Math.min(w - paddleWidth, paddleX));
+}
 
 let bricks = [];
 for (let c = 0; c < brickColumnCount; c++) {
@@ -295,8 +308,9 @@ function getTouchPosition(touch) {
 
 // 鼠标和触摸事件处理
 document.addEventListener("mousemove", mouseMoveHandler, false);
-document.addEventListener("touchmove", touchMoveHandler, { passive: false });
-document.addEventListener("touchstart", touchStartHandler, { passive: false });
+// Слушаем touch только на canvas: глобальный перехват ломал click-кнопки меню
+canvas.addEventListener("touchmove", touchMoveHandler, { passive: false });
+canvas.addEventListener("touchstart", touchStartHandler, { passive: false });
 
 function mouseMoveHandler(e) {
     if (gameState !== 'playing') return;
@@ -323,10 +337,10 @@ function touchMoveHandler(e) {
 }
 
 function touchStartHandler(e) {
-    e.preventDefault(); // 防止页面滚动
-
-    // 如果菜单打开，不处理触摸
+    // 如果菜单打开，不处理触摸 — и не подавляем compatibility click по кнопкам
     if (gameState === 'menu') return;
+
+    e.preventDefault(); // 防止页面滚动 (только во время gameplay)
 
     const touch = e.touches[0];
     const relativeX = getTouchPosition(touch);
@@ -879,12 +893,25 @@ document.addEventListener("DOMContentLoaded", () => {
     // 高分榜按钮
     const clearScoresBtn = document.getElementById('clearScoresBtn');
     if (clearScoresBtn) {
+        let clearArmed = false;
+        let clearTimer = null;
         clearScoresBtn.addEventListener('click', () => {
-            if (confirm('Are you sure you want to clear all high scores?')) {
-                highScores = [];
-                localStorage.removeItem('starlightBreakerHighScores');
-                displayHighScores();
+            // window.confirm в хабе подменён на false, поэтому подтверждение — повторным тапом
+            if (!clearArmed) {
+                clearArmed = true;
+                const label = clearScoresBtn.textContent;
+                clearScoresBtn.textContent = 'Точно очистить?';
+                clearTimer = setTimeout(() => {
+                    clearArmed = false;
+                    clearScoresBtn.textContent = label;
+                }, 3000);
+                return;
             }
+            clearTimeout(clearTimer);
+            clearArmed = false;
+            highScores = [];
+            localStorage.removeItem('starlightBreakerHighScores');
+            displayHighScores();
         });
     }
     
