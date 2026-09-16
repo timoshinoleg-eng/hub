@@ -38,8 +38,8 @@ assert.ok(index.includes('assets/icons.svg#brand'), 'shell uses the local brand 
 for (const id of GAMES.map((g) => g.icon)) assert.ok(icons.includes(`id="${id}"`), `sprite contains ${id}`);
 assert.ok(icons.includes('id="brand"'), 'sprite contains brand symbol');
 
-assert.ok(hub.includes("from './progress.js'"), 'hub has local progression');
-assert.ok(hub.includes("from './engagement.js'") && hub.includes('observeVisit()'), 'privacy-safe engagement is wired into production shell');
+assert.ok(hub.includes('await import(`./progress.js?v=${v}`)'), 'hub has versioned local progression');
+assert.ok(hub.includes('await import(`./engagement.js?v=${v}`)') && hub.includes('observeVisit()'), 'privacy-safe engagement is wired into production shell');
 assert.ok(hub.includes("track('new_record'") && hub.includes("track('daily_complete'"), 'record and daily retention events');
 assert.ok(hub.includes("track('return_visit'") && hub.includes("track('first_visit'"), 'return/first visit events are emitted by the shell');
 assert.ok(hub.includes("bridge.haptic('selection')"), 'MAX haptic feedback stays integrated');

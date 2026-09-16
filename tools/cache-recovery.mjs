@@ -36,7 +36,11 @@ assert.equal(currentShell.appended.length, 0, 'current shell owns a single modul
 assert.match(index, /window\.__HUB_DYNAMIC_BOOT__\s*=\s*true/, 'current shell identifies its versioned boot path');
 assert.match(index, /js\/bootstrap\.js\?v=/, 'current shell loads a versioned bootstrap module URL');
 assert.doesNotMatch(index, /<script type="module" src="js\/main\.js"><\/script>/, 'unversioned static main boot is removed');
-assert.match(main, /from '\.\/bridge\.js\?v=/, 'recovery main module requests an uncached bridge');
+for (const dep of ['bridge', 'track', 'share', 'duel', 'daily', 'engagement', 'progress', 'games']) {
+  const expected = `await import(\`./${dep}.js?v=\${v}\`)`;
+  assert.ok(main.includes(expected), `recovery main module requests versioned ${dep}.js`);
+}
+assert.doesNotMatch(main, /from ['"]\.\/(track|share|duel|daily|engagement|progress|games)\.js['"]/, 'nested Hub modules are never imported with stale unversioned URLs');
 assert.match(main, /document\.readyState === 'loading'/, 'recovery main module initializes after a late dynamic load');
 
 console.log('MAX cached-shell recovery contract: ok');
