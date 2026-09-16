@@ -120,6 +120,12 @@ expect(
   gameButtons.filter((button) => button.text !== '« Назад')
     .every((button) => button.type === 'open_app' && button.web_app === BOT_USERNAME)
 );
+expect(
+  'в меню 12 игровых кнопок без undefined в подписях',
+  gameButtons.filter((button) => button.text !== '« Назад').length === LIVE.length &&
+    gameButtons.filter((button) => button.text !== '« Назад').every((button) => !/undefined/i.test(button.text || '')),
+  `кнопок: ${gameButtons.filter((button) => button.text !== '« Назад').length}`
+);
 const subs = await db.listSubscribers();
 expect('подписчик записан', subs.length === 1 && Number(subs[0].user_id) === UID, `подписчиков: ${subs.length}`);
 const stats = await db.stats();
