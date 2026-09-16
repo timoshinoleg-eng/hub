@@ -18,7 +18,7 @@ const openAppButton = (text, payload) =>
     : Keyboard.button.openApp(text);
 
 function playButton(g) {
-  return openAppButton(`${g.emoji} ${g.title}`, `g${g.id}`);
+  return openAppButton(g.title, `g${g.id}`);
 }
 
 function mainKeyboard() {
@@ -40,7 +40,7 @@ function gamesKeyboard() {
   return Keyboard.inlineKeyboard(rows);
 }
 
-const titles = LIVE.map((g) => `${g.emoji} ${g.title}`).join(', ');
+const titles = LIVE.map((g) => g.title).join(', ');
 const welcome = (name) =>
   `${name ? name + ', в' : 'В'}ы в игротеке — подборке коротких игр, в которые можно сыграть прямо в чате.\n\n` +
   `Сейчас доступны: ${titles}.\n\n` +
