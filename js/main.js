@@ -1,11 +1,14 @@
-import { bridge } from './bridge.js?v=20260910-1';
-import { track, hasConsent, setConsent, subscribe } from './track.js';
-import { cardDataUrl, shareText } from './share.js';
-import { duelResult } from './duel.js';
-import { dailySeed } from './daily.js';
-import { observeVisit } from './engagement.js';
-import { getGameProgress, getSummary, recordFinish } from './progress.js';
-import { GAMES, byId, visible } from './games.js';
+const revision = window.HUB_ASSET_REVISION || '20260916-games12';
+const v = encodeURIComponent(revision);
+
+const { bridge } = await import(`./bridge.js?v=${v}`);
+const { track, hasConsent, setConsent, subscribe } = await import(`./track.js?v=${v}`);
+const { cardDataUrl, shareText } = await import(`./share.js?v=${v}`);
+const { duelResult } = await import(`./duel.js?v=${v}`);
+const { dailySeed } = await import(`./daily.js?v=${v}`);
+const { observeVisit } = await import(`./engagement.js?v=${v}`);
+const { getGameProgress, getSummary, recordFinish } = await import(`./progress.js?v=${v}`);
+const { GAMES, byId, visible } = await import(`./games.js?v=${v}`);
 
 const CFG = window.HUB_CONFIG || {};
 const NOTIFICATIONS_ENABLED = CFG.notificationsEnabled === true;
