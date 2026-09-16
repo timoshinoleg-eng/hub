@@ -1,4 +1,4 @@
-const HUB_ASSET_REVISION = '20260912-quizzzz';
+const HUB_ASSET_REVISION = '20260916-games12';
 
 window.HUB_CONFIG = {
   bot: '',
