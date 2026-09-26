@@ -1,5 +1,11 @@
 # Игротека — хаб мини-игр для MAX
 
+<!-- product-snapshot:start -->
+> **Продукт:** единый MAX Mini App-хаб из 12 HTML5-игр с общим bridge, ботом, daily-механиками, challenges и privacy-aware аналитикой.
+>
+> **Стадия:** active / soft-launch foundation · **Платформа:** MAX · **Продуктовый фокус:** retention, повторные сессии и будущая монетизация портфеля игр.
+<!-- product-snapshot:end -->
+
 Небольшой no-build хаб HTML5-игр для MAX: статический frontend, Fastify-сервер событий и бот на `@maxhub/max-bot-api`.
 
 ## Архитектура
