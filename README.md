@@ -1,5 +1,8 @@
 # Игротека — хаб мини-игр для MAX
 
+> **LEGACY / SEPARATE PRODUCT NOTICE**  
+> This repository is the standalone MAX game hub previously served from `quiz.chatbot24.su`. It is **not OFELIYA: STRAIN ZERO**, must not be used as an OFELIYA production source, and must not provide bot credentials, deployment config, API authority or release evidence for OFELIYA. Canonical OFELIYA lives in `timoshinoleg-eng/ofeliya`, uses `@id402806822924_5_bot`, and is served from `https://ofeliya.freeveol.dpdns.org/ofeliya/`. The historical Chatbot24 bot `@id402806822924_1_bot` is retired.
+
 <!-- product-snapshot:start -->
 > **Продукт:** единый MAX Mini App-хаб из 12 HTML5-игр с общим bridge, ботом, daily-механиками, challenges и privacy-aware аналитикой.
 >
