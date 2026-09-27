@@ -25,6 +25,16 @@ const el = (tag, cls, html) => {
 const state = { game: null, score: null, challenge: null, finishMeta: null };
 window.__hubStartParam = bridge.startParam();
 
+/**
+ * Полная очистка fixed-оверлея. Вызывается при любом уходе из игрового вида
+ * (кнопка «‹», MAX BackButton, «К играм»), иначе элементы из #overlay
+ * переживают смену view и перекрывают меню.
+ */
+function clearOverlay() {
+  const overlay = $('#overlay');
+  if (overlay) overlay.innerHTML = '';
+}
+
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -140,7 +150,7 @@ function openGame(id, challenge = null) {
   if (challenge != null) src += (src.includes('?') ? '&' : '?') + 'challenge=' + challenge;
 
   $('#game-frame').src = src;
-  $('#overlay').innerHTML = '';
+  clearOverlay();
   document.body.dataset.view = 'game';
   track('open_game', g.id);
   bridge.haptic('selection');
@@ -151,11 +161,17 @@ function openGame(id, challenge = null) {
 function backToMenu() {
   offBack();
   offBack = () => {};
+  // Оверлей живёт в отдельном fixed-слое и не скрывается переключением
+  // body[data-view]. Без явной очистки карточка результата, challenge-баннер
+  // или подсказка остаются поверх меню и перехватывают касания.
+  clearOverlay();
   $('#game-frame').src = 'about:blank';
   $('#game-score').textContent = '';
   document.body.dataset.view = 'menu';
   state.game = null;
   state.challenge = null;
+  state.score = null;
+  state.finishMeta = null;
   renderMenu();
   track('back_to_menu');
 }
@@ -280,7 +296,7 @@ function showResult() {
     };
   }
 
-  $('#overlay').innerHTML = '';
+  clearOverlay();
   $('#overlay').appendChild(box);
   bridge.haptic(meta.newBest ? 'notify' : 'selection');
 }

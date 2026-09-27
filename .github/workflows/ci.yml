@@ -24,10 +24,14 @@ jobs:
         run: npm run smoke:product
       - name: UI state contract
         run: npm run smoke:ui-state
+      - name: Shell overlay contract
+        run: npm run smoke:shell
       - name: Iframe bridge contract
         run: npm run smoke:bridge
       - name: Analytics transport and privacy
         run: npm run smoke:track
+      - name: Analytics endpoint resolution
+        run: npm run smoke:track-endpoint
       - name: MAX initData authentication
         run: npm run smoke:auth
       - name: Merge mechanics

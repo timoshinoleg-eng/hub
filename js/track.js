@@ -5,7 +5,23 @@
  */
 const KEY = 'ofeliya_events';
 const RAW_ENDPOINT = window.HUB_TRACK_ENDPOINT || '';
-const ENDPOINT = RAW_ENDPOINT && (location.protocol !== 'https:' || /^https:\/\//i.test(RAW_ENDPOINT)) ? RAW_ENDPOINT : '';
+
+/**
+ * Endpoint принимается, если он same-origin относительный путь или
+ * абсолютный HTTPS URL. Смешанное содержимое (http:// endpoint на https://
+ * странице) отбрасывается: иначе браузер всё равно заблокирует запрос,
+ * а мы потеряем события без диагностики.
+ *
+ * Пустое значение означает «аналитика не настроена» и остаётся валидным
+ * состоянием для phase-1 статики без server.
+ */
+function resolveEndpoint(raw) {
+  if (!raw) return '';
+  if (raw.startsWith('/')) return raw;
+  if (location.protocol !== 'https:') return raw;
+  return /^https:\/\//i.test(raw) ? raw : '';
+}
+const ENDPOINT = resolveEndpoint(RAW_ENDPOINT);
 const CONSENT_KEY = 'ofeliya_consent';
 const SESSION_ID = (() => {
   try {

@@ -69,8 +69,13 @@ export function createBot() {
 
   // Обычная бот-аналитика не связывается с user_id. Identity хранится только
   // в subscribers после явного действия «Уведомить о запуске».
+  //
+  // verified=true: событие пришло из webhook, аутентифицированного
+  // HUB_BOT_WEBHOOK_SECRET, то есть источник достоверен на стороне сервера.
+  // Без этой отметки bot_start/bot_pick_game/notify_subscribe выпадали бы из
+  // воронки вместе с неподписанным браузерным трафиком.
   const track = (ctx, action, game) =>
-    db.insertEvent({ uid_hash: db.anonId(), game, action });
+    db.insertEvent({ uid_hash: db.anonId(), game, action, verified: true });
 
   const gameFromPayload = (p) => {
     const m = /^g([a-z]{2,16})$/.exec(String(p || '').trim());
