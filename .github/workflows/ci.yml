@@ -22,6 +22,10 @@ jobs:
         run: npm run check
       - name: Vendor reproducibility
         run: npm run smoke:vendor
+      - name: Game provenance
+        run: npm run smoke:provenance
+      - name: Licensing
+        run: npm run smoke:licensing
       - name: Product and playability contract
         run: npm run smoke:product
       - name: UI state contract

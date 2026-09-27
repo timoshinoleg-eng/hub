@@ -1,0 +1,42 @@
+MIT License
+
+Copyright (c) 2026 Игротека (timoshinoleg-eng)
+
+Настоящий файл покрывает ТОЛЬКО код, написанный для этого репозитория:
+оболочку (index.html, css/, js/, games/_boot.js), сервер (server/), бота (bot/),
+инструменты (tools/) и деплой (deploy/, Dockerfile).
+
+Сторонний код, производный из внешних проектов, распространяется на условиях
+своих собственных лицензий. Его происхождение, проверенные ревизии и перечень
+адаптаций перечислены в THIRD-PARTY.md, полные тексты лицензий — в licenses/.
+
+Код, производный из he-is-talha/html-css-javascript-games (games/merge,
+games/reaction, games/snake, games/sapper, games/quiz, games/echo, games/memory,
+games/sudoku, games/lights, games/nonogram, games/battleship):
+Copyright (c) 2024 Talha Bin Yousaf — MIT License, см.
+licenses/he-is-talha-MIT.txt
+
+Код, производный из ChanMeng666/html-brick-game (games/brick):
+Copyright (c) 2026 Chan Meng — MIT License, см.
+licenses/html-brick-game-MIT.txt
+
+Логика игры «Квизик» в этом репозитории отсутствует: карточка games/quiz —
+это handoff на /quiz/, обслуживаемый отдельным продуктом Quizzzz.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

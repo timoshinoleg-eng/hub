@@ -15,6 +15,7 @@ index.html / css/          оболочка хаба
 js/bridge.js               capability-adapter MAX Bridge
 js/games.js                единый манифест игр
 js/main.js                 меню, iframe, result/share/duel/consent
+js/ui-state.js             чистые правила текстов и состояний (тестируются напрямую)
 js/track.js                анонимная аналитика + signed initData после consent
 js/daily.js                единая граница «пазла дня» Europe/Moscow
 games/_boot.js             одноразовый postMessage handshake iframe ↔ hub
@@ -25,7 +26,11 @@ server/db.mjs              Postgres production / JSON только dev-test
 bot/                       MAX bot
 legal/                     шаблоны правовых документов
 tools/                     smoke tests, vendor и стабильные overrides
+licenses/                  полные тексты лицензий сторонних доноров
 ```
+
+Лицензирование: собственный код — MIT ([`LICENSE`](LICENSE)), обязательные уведомления о
+стороннем коде — [`NOTICE`](NOTICE) и [`THIRD-PARTY.md`](THIRD-PARTY.md).
 
 ## Требования
 
