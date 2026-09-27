@@ -1,9 +1,9 @@
 {
-  "name": "ofeliya-hub",
+  "name": "chatbot24-max-game-hub",
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Хаб мини-игр для мессенджера MAX. Фронтенд — статика без сборки; сервер событий и бот — Node.",
+  "description": "Отдельный legacy-хаб мини-игр для MAX; не является OFELIYA: STRAIN ZERO.",
   "scripts": {
     "dev": "npx --yes serve . -l 5173",
     "server": "node --env-file=.env server/index.mjs",
