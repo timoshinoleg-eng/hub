@@ -36,11 +36,23 @@ assert.equal(currentShell.appended.length, 0, 'current shell owns a single modul
 assert.match(index, /window\.__HUB_DYNAMIC_BOOT__\s*=\s*true/, 'current shell identifies its versioned boot path');
 assert.match(index, /js\/bootstrap\.js\?v=/, 'current shell loads a versioned bootstrap module URL');
 assert.doesNotMatch(index, /<script type="module" src="js\/main\.js"><\/script>/, 'unversioned static main boot is removed');
-for (const dep of ['bridge', 'track', 'share', 'duel', 'daily', 'engagement', 'progress', 'games']) {
+for (const dep of ['bridge', 'track', 'share', 'duel', 'daily', 'engagement', 'progress', 'ui-state', 'games']) {
   const expected = `await import(\`./${dep}.js?v=\${v}\`)`;
   assert.ok(main.includes(expected), `recovery main module requests versioned ${dep}.js`);
 }
-assert.doesNotMatch(main, /from ['"]\.\/(track|share|duel|daily|engagement|progress|games)\.js['"]/, 'nested Hub modules are never imported with stale unversioned URLs');
+assert.doesNotMatch(main, /from ['"]\.\/(track|share|duel|daily|engagement|progress|ui-state|games)\.js['"]/, 'nested Hub modules are never imported with stale unversioned URLs');
 assert.match(main, /document\.readyState === 'loading'/, 'recovery main module initializes after a late dynamic load');
 
+// launch-router.js — единственный модуль, импортируемый до main.js, и раньше
+// единственный со статическим импортом bridge.js. Именно такой остаточный
+// неверсионированный импорт кешировался между запусками MAX WebView.
+const router = readFileSync(join(root, 'js', 'launch-router.js'), 'utf8');
+assert.doesNotMatch(router, /^import\s/m, 'launch-router has no unversioned static imports');
+assert.match(router, /import\(`\.\/bridge\.js\?v=\$\{REVISION\}`\)/, 'launch-router loads bridge.js with the release revision');
+assert.match(router, /globalThis\.window\?\.HUB_ASSET_REVISION/, 'launch-router reads the revision defensively, so Node-side imports still work');
+// Ревизия обязана приходить из runtime-config, а не быть зашитой в модуль.
+assert.match(router, /HUB_ASSET_REVISION/, 'launch-router derives the revision from runtime config');
+
 console.log('MAX cached-shell recovery contract: ok');
+console.log('  every executable module in the shell graph is loaded with a release-scoped URL');
+console.log('  including launch-router.js, which is evaluated before main.js');

@@ -2,7 +2,7 @@ const revision = window.HUB_ASSET_REVISION || '20260916-games12';
 const v = encodeURIComponent(revision);
 
 const { bridge } = await import(`./bridge.js?v=${v}`);
-const { track, hasConsent, setConsent, subscribe } = await import(`./track.js?v=${v}`);
+const { track, hasConsent, setConsent, subscribe, revokeConsent, clearConsent, subscriptionAvailable, installErrorReporting } = await import(`./track.js?v=${v}`);
 const { cardDataUrl, shareText } = await import(`./share.js?v=${v}`);
 const { duelResult } = await import(`./duel.js?v=${v}`);
 const { dailySeed } = await import(`./daily.js?v=${v}`);
@@ -30,9 +30,73 @@ window.__hubStartParam = bridge.startParam();
  * (кнопка «‹», MAX BackButton, «К играм»), иначе элементы из #overlay
  * переживают смену view и перекрывают меню.
  */
+const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Полная очистка fixed-оверлея. Вызывается при любом уходе из игрового вида
+ * (кнопка «‹», MAX BackButton, «К играм»), иначе элементы из #overlay
+ * переживают смену view и перекрывают меню.
+ *
+ * Заодно снимает модальность и возвращает фокус туда, откуда оверлей был
+ * открыт: иначе после закрытия карточки результата фокус падал на body и
+ * клавиатурная навигация начиналась заново от верха страницы.
+ */
+let lastOverlayFocus = null;
+const MODAL_ATTRS = ['role', 'aria-modal', 'aria-label'];
 function clearOverlay() {
   const overlay = $('#overlay');
-  if (overlay) overlay.innerHTML = '';
+  if (overlay) {
+    overlay.innerHTML = '';
+    // Снимаем именно те атрибуты, которые выставил markModal. Раньше здесь был
+    // removeAttribute('aria-hidden') — атрибута, которого markModal не ставит, —
+    // поэтому после закрытия пустой оверлей оставался объявлен как
+    // role="dialog" aria-modal="true", и скринридер объявлял пустой диалог.
+    for (const attr of MODAL_ATTRS) overlay.removeAttribute(attr);
+    delete document.body.dataset.modal;
+  }
+  if (lastOverlayFocus && document.contains(lastOverlayFocus)) {
+    try { lastOverlayFocus.focus({ preventScroll: true }); } catch { /* элемент мог исчезнуть */ }
+  }
+  lastOverlayFocus = null;
+  document.removeEventListener('keydown', onOverlayKeydown, true);
+}
+
+/**
+ * Модальность оверлея: помечает слой, запоминает фокус, ставит ловушку и
+ * закрывает по Escape. Раньше карточка результата была просто div в
+ * position:fixed — без роли, без ловушки и без закрытия с клавиатуры.
+ */
+function markModal() {
+  const overlay = $('#overlay');
+  if (!overlay) return;
+  lastOverlayFocus = document.activeElement;
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Игровой результат');
+  document.body.dataset.modal = 'true';
+  document.addEventListener('keydown', onOverlayKeydown, true);
+  // Фокус на первом действии, а не на body: иначе клавиатура не доходит до кнопок.
+  const first = overlay.querySelector(FOCUSABLE);
+  try { first?.focus({ preventScroll: true }); } catch { /* фокус может быть недоступен */ }
+}
+
+function onOverlayKeydown(e) {
+  const overlay = $('#overlay');
+  if (!overlay || !overlay.firstElementChild) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    clearOverlay();
+    return;
+  }
+  if (e.key !== 'Tab') return;
+  // Ловушка фокуса: без неё Tab уходит в скрытое под меню содержимое, и
+  // клавиатурный пользователь проваливается в недоступную область.
+  const items = [...overlay.querySelectorAll(FOCUSABLE)].filter((n) => n.offsetParent !== null || n === document.activeElement);
+  if (!items.length) return;
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
 }
 
 function esc(s) {
@@ -213,12 +277,79 @@ function onMessage(e) {
 }
 
 const NOTIFY_PROMPT_KEY = 'hub_notify_prompted_v1';
+
+// Fail-closed по обоим условиям: без работающего analytics endpoint кнопка
+// подписки показывалась бы и получала 503. Раньше проверялся только флаг
+// конфигурации. Это инвариант, который потерялся при закрытии PR #7.
 function shouldOfferNotify(today) {
-  if (!NOTIFICATIONS_ENABLED || hasConsent() || getSummary(today).finishes < 3) return false;
+  if (!subscriptionAvailable()) return false;
+  if (hasConsent() || getSummary(today).finishes < 3) return false;
   try { return localStorage.getItem(NOTIFY_PROMPT_KEY) !== '1'; } catch { return false; }
 }
 function markNotifyPrompted() {
   try { localStorage.setItem(NOTIFY_PROMPT_KEY, '1'); } catch {}
+}
+
+// ── Отзыв согласия ─────────────────────────────────────────────────────────
+//
+// Раньше отозвать согласие было нечем: hasConsent() ставил '1' в localStorage
+// навсегда, /forget был доступен только командой боту, а в POLICY.md стоял
+// плейсхолдер [контакт оператора]. После согласия каждое событие несло
+// подписанный initData, то есть оператор получал постоянный связываемый
+// HMAC-алиас, и снять согласие из интерфейса было невозможно.
+function openPrivacyPanel() {
+  const box = el('div', 'result');
+  const record = hasConsent();
+  box.innerHTML =
+    `<div class="rcard"><div class="rttl" style="font-size:17px;color:#fff;margin-bottom:10px">Ваши данные</div>` +
+    `<p style="margin:0 0 12px;color:var(--mut);font-size:12.5px">` +
+    (record
+      ? 'Согласие на игровые новинки выдано. Оно используется только для отправки уведомлений; отзыв стирает связанные с вами данные у оператора.'
+      : 'Согласия на обработку данных нет. Игровые события отправляются анонимно и не содержат вашего идентификатора.') +
+    `</p>` +
+    `<div class="rrow">` +
+    (record
+      ? '<button class="btn" id="p-revoke">Отозвать согласие</button>'
+      : '<button class="btn primary" id="p-grant">Разрешить новинки</button>') +
+    '<button class="btn" id="p-close">Закрыть</button>' +
+    `</div>` +
+    `<div class="result-links"><button class="result-link" id="p-forget">Удалить все мои данные</button></div>` +
+    (CFG.policyUrl ? `<p style="margin:12px 0 0;font-size:11.5px"><a href="${CFG.policyUrl}" target="_blank" rel="noopener">Политика обработки данных</a></p>` : '') +
+    `</div>`;
+  $('#overlay').appendChild(box);
+  markModal();
+  const close = () => clearOverlay();
+  box.querySelector('#p-close').onclick = close;
+  const revoke = box.querySelector('#p-revoke');
+  if (revoke) revoke.onclick = async () => {
+    revoke.disabled = true;
+    revoke.textContent = 'Отзываем…';
+    const r = await revokeConsent();
+    track('consent_revoked');
+    clearConsent();
+    revoke.textContent = r.serverNotified ? '✓ Согласие отозвано' : 'Отозвано локально';
+    if (!r.serverNotified) revoke.textContent = 'Отозвано на устройстве';
+    setTimeout(close, 1200);
+  };
+  const grant = box.querySelector('#p-grant');
+  if (grant) grant.onclick = () => {
+    setConsent();
+    track('consent_yes');
+    close();
+  };
+  box.querySelector('#p-forget').onclick = async () => {
+    const r = await revokeConsent();
+    track('data_deleted');
+    clearOverlay();
+    const done = el('div', 'result');
+    done.innerHTML =
+      `<div class="rcard"><div class="rttl" style="font-size:17px;color:#fff;margin-bottom:8px">Данные удалены</div>` +
+      `<p style="margin:0;color:var(--mut);font-size:12.5px">${r.serverNotified
+        ? 'Оператору отправлен запрос на удаление, связанные с вами события стёрты.'
+        : 'Связанные с вами события стёрты с устройства. Повторите команду /forget у бота, чтобы оператор тоже удалил данные.'}</p></div>`;
+    $('#overlay').appendChild(done);
+    setTimeout(clearOverlay, 4000);
+  };
 }
 
 function confettiHtml() {
@@ -270,11 +401,11 @@ function showResult() {
   });
   box.querySelector('#r-again').onclick = () => {
     track('replay', g.id, score);
-    box.remove();
+    clearOverlay();
     openGame(g.id, state.challenge);
   };
   box.querySelector('#r-menu').onclick = () => {
-    box.remove();
+    clearOverlay();
     backToMenu();
   };
   box.querySelector('#r-share').onclick = async () => {
@@ -299,6 +430,7 @@ function showResult() {
   clearOverlay();
   $('#overlay').appendChild(box);
   bridge.haptic(meta.newBest ? 'notify' : 'selection');
+  markModal();
 }
 
 async function doSubscribe(btn, g, score) {
@@ -318,17 +450,50 @@ function showConsent(onAccept) {
   box.querySelector('#c-yes').onclick = () => {
     setConsent();
     track('consent_yes');
-    box.remove();
+    clearOverlay();
     onAccept?.();
   };
   box.querySelector('#c-no').onclick = () => {
     track('consent_no');
-    box.remove();
+    clearOverlay();
   };
   $('#overlay').appendChild(box);
+  markModal();
+}
+
+/**
+ * Проверка критичной конфигурации.
+ *
+ * HUB_CONFIG.bot пустой означает, что весь флагманский цикл «результат →
+ * челлендж другу → дуэль» молча не работает: deepLink() вернёт пустую строку,
+ * шаринг уйдёт без ссылки, а единственный сигнал был console.warn, невидимый
+ * пользователю. Теперь это видно в интерфейсе, а не в консоли.
+ */
+function configProblems() {
+  const problems = [];
+  if (!CFG.bot) problems.push('HUB_CONFIG.bot не задан — ссылки-челленджи в шаринге отключены');
+  if (!trackConfigured()) problems.push('Аналитика не настроена (HUB_TRACK_ENDPOINT)');
+  if (!bridge.available()) problems.push('MAX Bridge недоступен — приложение открыто вне MAX');
+  return problems;
+}
+function trackConfigured() {
+  const raw = window.HUB_TRACK_ENDPOINT || '';
+  return Boolean(raw);
+}
+
+function showConfigBanner() {
+  const problems = configProblems();
+  if (!problems.length) return;
+  const n = el('div', 'config-warn');
+  n.innerHTML = '<b>Ограниченный режим</b><ul>' +
+    problems.map((x) => `<li>${esc(x)}</li>`).join('') + '</ul>';
+  $('#legal').before(n);
 }
 
 function init() {
+  // Ошибки ловим до всего остального, иначе падение в модуле останется
+  // невидимым: в MAX WebView нет консоли, есть только пустой экран.
+  installErrorReporting();
   bridge.ready();
   bridge.expand();
   renderMenu();
@@ -346,7 +511,9 @@ function init() {
   const links = [];
   if (CFG.policyUrl) links.push(`<a href="${CFG.policyUrl}" target="_blank" rel="noopener">Политика</a>`);
   if (CFG.offerUrl) links.push(`<a href="${CFG.offerUrl}" target="_blank" rel="noopener">Оферта</a>`);
-  $('#legal').innerHTML = parts.join(' · ') + (links.length ? '<br>' + links.join(' · ') : '');
+  $('#legal').innerHTML = parts.join(' · ') + (links.length ? '<br>' + links.join(' · ') : '') +
+    '<br><button class="result-link" id="privacy-open">Ваши данные и согласие</button>';
+  $('#privacy-open').onclick = openPrivacyPanel;
 
   const sp = parseStartParam(window.__hubStartParam);
   if (sp) {
@@ -360,6 +527,7 @@ function init() {
       setTimeout(() => n.remove(), 4000);
     }
   }
+  showConfigBanner();
   if (!CFG.bot) console.warn('[hub] HUB_CONFIG.bot не задан — deep link в шаринге работать не будет');
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
