@@ -72,11 +72,18 @@ export async function buildServer({ logger = true } = {}) {
   app.post('/ev', async (req, reply) => {
     const b = bodyObject(req.body);
     if (!isAction(b.action)) return reply.code(400).send({ error: 'bad action' });
+    // Событие считается доверенным только при валидной подписи MAX initData.
+    // Без неё запись всё равно сохраняется, но помечается verified=false и
+    // не участвует в продуктовой воронке: иначе любой HTTP-клиент может
+    // залить open_bot/open_game/finish с произвольным sid и испортить
+    // start_rate_pct, по которому SOFT_LAUNCH_KPI принимает go/hide-решения.
     let uid_hash = db.anonId();
+    let verified = false;
     if (typeof b.init_data === 'string' && b.init_data) {
       const auth = verifyBody(b);
-      if (!auth.ok) return reply.code(401).send({ error: 'bad init_data', reason: auth.reason });
+      if (!auth.ok) return reply.code(401).send({ error: 'bad_init_data', reason: auth.reason });
       uid_hash = db.hashUid(auth.user.id);
+      verified = true;
     }
     await db.insertEvent({
       uid_hash,
@@ -85,6 +92,7 @@ export async function buildServer({ logger = true } = {}) {
       action: b.action,
       value: Number.isFinite(Number(b.value)) ? Number(b.value) : null,
       sp: clamp(b.sp, 64),
+      verified,
     });
     return { ok: true };
   });

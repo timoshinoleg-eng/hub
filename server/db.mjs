@@ -40,11 +40,19 @@ CREATE TABLE IF NOT EXISTS hub_events (
   action      varchar(48)  NOT NULL,
   value       integer,
   sp          varchar(64),
+  verified    boolean     NOT NULL DEFAULT false,
   ts          timestamptz  NOT NULL DEFAULT now()
 );
 ALTER TABLE hub_events ADD COLUMN IF NOT EXISTS session_id varchar(64);
+ALTER TABLE hub_events ADD COLUMN IF NOT EXISTS verified boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS hub_events_game_idx ON hub_events (game, action);
 CREATE INDEX IF NOT EXISTS hub_events_session_idx ON hub_events (session_id, action);
+-- Индекс по ts обязателен: /stats?days=N и retention-очистка работают как
+-- диапазонные выборки, а /health больше не делает count(*) по всей таблице.
+CREATE INDEX IF NOT EXISTS hub_events_ts_idx ON hub_events (ts);
+-- Воронка строится только по подписанным событиям, поэтому partial index
+-- заметно меньше полного и не растёт от неподписанного шума.
+CREATE INDEX IF NOT EXISTS hub_events_verified_idx ON hub_events (action, session_id) WHERE verified;
 
 CREATE TABLE IF NOT EXISTS hub_subscribers (
   user_id   bigint PRIMARY KEY,
@@ -74,16 +82,16 @@ export async function init() {
   return driver;
 }
 
-export async function insertEvent({ uid_hash, session_id = null, game, action, value, sp }) {
+export async function insertEvent({ uid_hash, session_id = null, game, action, value, sp, verified = false }) {
   if (driver === 'json') {
-    jsonDb.events.push({ uid_hash, session_id, game, action, value, sp, ts: new Date().toISOString() });
+    jsonDb.events.push({ uid_hash, session_id, game, action, value, sp, verified: !!verified, ts: new Date().toISOString() });
     if (jsonDb.events.length > 50000) jsonDb.events = jsonDb.events.slice(-50000);
     saveJson();
     return;
   }
   await pg.query(
-    `INSERT INTO hub_events (uid_hash, session_id, game, action, value, sp) VALUES ($1,$2,$3,$4,$5,$6)`,
-    [uid_hash, session_id || null, game || null, action, value ?? null, sp || '']
+    `INSERT INTO hub_events (uid_hash, session_id, game, action, value, sp, verified) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [uid_hash, session_id || null, game || null, action, value ?? null, sp || '', !!verified]
   );
 }
 
@@ -225,9 +233,13 @@ export async function stats({ days = 0 } = {}) {
 
   if (driver === 'json') {
     const cutoff = days ? Date.now() - days * 86400000 : 0;
-    const events = cutoff
+    const inWindow = cutoff
       ? jsonDb.events.filter((e) => Number.isFinite(Date.parse(e.ts)) && Date.parse(e.ts) >= cutoff)
       : jsonDb.events;
+    // Воронка строится только по подписанным событиям. Неподписанные остаются
+    // видимыми в unverified_events как диагностический счётчик, но не влияют
+    // на KPI, по которым принимаются продуктовые решения.
+    const events = inWindow.filter((e) => e.verified);
     const counts = {};
     const games = {};
     let nextDayReturns = 0;
@@ -240,28 +252,35 @@ export async function stats({ days = 0 } = {}) {
     counts.subscribers = jsonDb.subscribers.filter((s) => s.consent).length;
     counts.games = games;
     counts.window_days = days;
+    // Покрытие подписью — обязательный показатель доверия к воронке.
+    // Клиент намеренно не передаёт signed initData до согласия (152-ФЗ,
+    // POLICY.md §3), поэтому pre-consent трафик неподписан by design.
+    counts.verified_events = events.length;
+    counts.unverified_events = inWindow.length - events.length;
+    counts.verified_share_pct = pct(events.length, inWindow.length);
     counts.funnel = buildFunnel(counts, nextDayReturns, sessionStatsFromEvents(events));
     counts.game_funnel = gameFunnelFromEvents(events);
     return counts;
   }
 
   const where = days ? `ts >= now() - ($1::int * interval '1 day')` : 'TRUE';
+  const and = `${where} AND verified`;
   const params = days ? [days] : [];
-  const r = await pg.query(`SELECT action, count(*)::int AS n FROM hub_events WHERE ${where} GROUP BY action`, params);
+  const r = await pg.query(`SELECT action, count(*)::int AS n FROM hub_events WHERE ${and} GROUP BY action`, params);
   const g = await pg.query(`
-    SELECT game, count(*)::int AS n FROM hub_events WHERE ${where} AND game IS NOT NULL GROUP BY game ORDER BY n DESC
+    SELECT game, count(*)::int AS n FROM hub_events WHERE ${and} AND game IS NOT NULL GROUP BY game ORDER BY n DESC
   `, params);
   const gf = await pg.query(`
     SELECT game, action, count(*)::int AS n FROM hub_events
-    WHERE ${where} AND game IS NOT NULL AND action IN ('open_game','finish','replay','share_ok')
+    WHERE ${and} AND game IS NOT NULL AND action IN ('open_game','finish','replay','share_ok')
     GROUP BY game, action
   `, params);
   const nd = await pg.query(`
     SELECT count(*)::int AS n FROM hub_events
-    WHERE ${where} AND action = 'return_visit' AND value = 1
+    WHERE ${and} AND action = 'return_visit' AND value = 1
   `, params);
   const sm = await pg.query(`
-    WITH scoped AS (SELECT session_id, action FROM hub_events WHERE ${where}),
+    WITH scoped AS (SELECT session_id, action FROM hub_events WHERE ${and}),
     opens AS (SELECT DISTINCT session_id FROM scoped WHERE action = 'open_bot' AND session_id IS NOT NULL)
     SELECT
       (SELECT count(*)::int FROM opens) AS open_sessions,
@@ -271,24 +290,40 @@ export async function stats({ days = 0 } = {}) {
     FROM scoped
   `, params);
   const s = await pg.query(`SELECT count(*)::int AS n FROM hub_subscribers WHERE consent = true`);
+  const uv = await pg.query(
+    `SELECT count(*)::int AS n FROM hub_events WHERE ${where} AND NOT verified`, params);
+  const vTotal = Number(r.rows.reduce((n, row) => n + row.n, 0));
 
-  const out = { subscribers: s.rows[0].n, games: {}, window_days: days };
+  const out = { subscribers: s.rows[0].n, games: {}, window_days: days, unverified_events: uv.rows[0].n };
   for (const a of KEY_ACTIONS) out[a] = 0;
   for (const row of r.rows) out[row.action] = row.n;
   for (const row of g.rows) out.games[row.game] = row.n;
+  out.verified_events = vTotal;
+  out.verified_share_pct = pct(vTotal, vTotal + Number(uv.rows[0].n));
   const sessionStats = Number(sm.rows[0]?.open_sessions || 0) > 0 ? sm.rows[0] : null;
   out.funnel = buildFunnel(out, nd.rows[0]?.n || 0, sessionStats);
   out.game_funnel = gameFunnelFromRows(gf.rows);
   return out;
 }
 
-export async function exportCsv() {
+/**
+ * Ограничение выгрузки. Без него `SELECT *` без LIMIT отдавал всю таблицу
+ * одним ответом: на реальном объёме это и память процесса, и ответ, который
+ * оператору не нужен. Значение по умолчанию достаточно для разбора воронки;
+ * увеличивать HUB_EXPORT_LIMIT осознанно.
+ */
+const EXPORT_LIMIT = Math.max(1, Math.min(Number(process.env.HUB_EXPORT_LIMIT) || 50000, 500000));
+
+export async function exportCsv({ limit = EXPORT_LIMIT } = {}) {
+  const cap = Math.max(1, Math.min(Number(limit) || EXPORT_LIMIT, 500000));
   const rows = driver === 'json'
-    ? jsonDb.events
-    : (await pg.query(`SELECT * FROM hub_events ORDER BY ts`)).rows;
+    ? jsonDb.events.slice(-cap)
+    : (await pg.query(
+        `SELECT ts, uid_hash, session_id, game, action, value, sp, verified
+         FROM hub_events ORDER BY ts DESC LIMIT $1`, [cap])).rows;
   if (!rows.length) return '';
-  const head = ['ts', 'uid_hash', 'session_id', 'game', 'action', 'value', 'sp'].join(',');
-  return [head, ...rows.map((r) => [r.ts, r.uid_hash, r.session_id, r.game, r.action, r.value, r.sp]
+  const head = ['ts', 'uid_hash', 'session_id', 'game', 'action', 'value', 'sp', 'verified'].join(',');
+  return [head, ...rows.map((r) => [r.ts, r.uid_hash, r.session_id, r.game, r.action, r.value, r.sp, r.verified]
     .map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
 }
 

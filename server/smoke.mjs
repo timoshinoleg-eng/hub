@@ -37,28 +37,44 @@ const admin = { authorization: `Bearer ${ADMIN_TOKEN}` };
 const S1 = 's_smoke_session_001';
 const S2 = 's_smoke_session_002';
 
+// Воронка строится только по подписанным событиям, поэтому сценарии ниже
+// отправляются с валидным initData. Обращение через text/plain beacon
+// проверяется отдельно — он остаётся поддерживаемым транспортом, но его
+// события не должны попадать в KPI.
+// Beacon-транспорт проверяется на отдельной сессии, чтобы его неподписанное
+// событие не влияло на сценарии воронки ниже.
 let r = await app.inject({
   method: 'POST', url: '/ev',
-  payload: JSON.stringify({ action: 'open_bot', sid: S1 }),
+  payload: JSON.stringify({ action: 'open_bot', sid: 's_beacon_session_000' }),
   headers: { 'content-type': 'text/plain;charset=UTF-8', origin: 'https://hub.example.ru' },
 });
 check('/ev принимает browser-like text/plain beacon', r.statusCode === 200 && json(r).ok, r.body);
-await post('/ev', { action: 'first_visit', sid: S1 });
-await post('/ev', { action: 'open_game', game: 'merge', sid: S1 });
-await post('/ev', { action: 'open_game', game: 'merge', sid: S1 });
-await post('/ev', { action: 'finish', game: 'merge', value: 340, sid: S1 });
-await post('/ev', { action: 'replay', game: 'merge', value: 340, sid: S1 });
-await post('/ev', { action: 'share_ok', game: 'merge', value: 340, sid: S1 });
-await post('/ev', { action: 'open_bot', sid: S2 });
-await post('/ev', { action: 'return_visit', value: 1, sid: S2 });
 
 const signed555 = initData(555);
-r = await post('/ev', { action: 'new_record', game: 'merge', value: 400, sid: S1, init_data: signed555 });
+const ev = (body) => post('/ev', { ...body, init_data: signed555 });
+await ev({ action: 'open_bot', sid: S1 });
+await ev({ action: 'first_visit', sid: S1 });
+await ev({ action: 'open_game', game: 'merge', sid: S1 });
+await ev({ action: 'open_game', game: 'merge', sid: S1 });
+await ev({ action: 'finish', game: 'merge', value: 340, sid: S1 });
+await ev({ action: 'replay', game: 'merge', value: 340, sid: S1 });
+await ev({ action: 'share_ok', game: 'merge', value: 340, sid: S1 });
+await ev({ action: 'open_bot', sid: S2 });
+await ev({ action: 'return_visit', value: 1, sid: S2 });
+
+r = await ev({ action: 'new_record', game: 'merge', value: 400, sid: S1 });
 check('/ev принимает валидированный MAX event', r.statusCode === 200, r.body);
 r = await post('/ev', { action: 'finish', init_data: initData(555, { tamper: true }) });
 check('/ev отклоняет поддельный initData', r.statusCode === 401, `код ${r.statusCode}`);
 r = await post('/ev', { action: '<script>alert(1)</script>' });
 check('/ev отклоняет мусор в action', r.statusCode === 400, `код ${r.statusCode}`);
+
+// Защита воронки от подделки: события без подписи сохраняются, но не должны
+// попадать в KPI. Иначе любой HTTP-клиент мог бы залить open_bot/open_game
+// с произвольным sid и решить судьбу игры по SOFT_LAUNCH_KPI §5/§7.
+await post('/ev', { action: 'open_bot', sid: 's_forged_session_999' });
+await post('/ev', { action: 'open_game', game: 'brick', sid: 's_forged_session_999' });
+await post('/ev', { action: 'finish', game: 'brick', value: 9999, sid: 's_forged_session_999' });
 
 r = await post('/sub', { init_data: signed555, game: 'merge' });
 check('/sub fail-closed без consent=true', r.statusCode === 400, r.body);
@@ -88,6 +104,13 @@ check('start rate считается по distinct sessions, а не по чис
 check('completion/replay/share funnel считается по раундам', stats.funnel?.completion_rate_pct === 50 && stats.funnel?.replay_rate_pct === 100 && stats.funnel?.share_rate_pct === 100, JSON.stringify(stats.funnel));
 check('return signal входит в session funnel', stats.funnel?.returning_sessions === 1 && stats.funnel?.next_day_return_events === 1 && stats.funnel?.returning_session_share_pct === 50, JSON.stringify(stats.funnel));
 check('per-game funnel сохраняет starts/finishes/replays/shares', stats.game_funnel?.merge?.starts === 2 && stats.game_funnel?.merge?.finishes === 1 && stats.game_funnel?.merge?.replays === 1 && stats.game_funnel?.merge?.shares === 1, JSON.stringify(stats.game_funnel));
+check('подделанные сессии не попадают в воронку', stats.funnel?.open_sessions === 2 && !stats.game_funnel?.brick, JSON.stringify(stats.game_funnel));
+check('неподписанные события видны как диагностический счётчик', stats.unverified_events === 4, `unverified_events=${stats.unverified_events}`);
+// 10 подписанных событий (2 open_bot, first_visit, 2 open_game, finish,
+// replay, share_ok, return_visit, new_record) из 14; неподписанных 4 —
+// beacon-сессия плюс три подделанные.
+check('покрытие подписью вычисляется и видно оператору', stats.verified_events === 10 && stats.verified_share_pct === 71.4, `verified=${stats.verified_events} share=${stats.verified_share_pct}`);
+check('событие open_bot подписано для обеих сессий', stats.funnel?.open_sessions === 2, JSON.stringify(stats.funnel));
 const sevenDays = json(await get('/stats?days=7', admin));
 check('/stats поддерживает валидное временное окно', sevenDays.window_days === 7);
 
@@ -112,4 +135,7 @@ console.log('--- Проверки сервера ---');
 for (const x of results) console.log(`${x.ok ? '✓' : '✗'} ${x.name}${!x.ok && x.detail ? ' → ' + x.detail : ''}`);
 const failed = results.filter((x) => !x.ok).length;
 if (failed) { console.error(`\nПровалено: ${failed} из ${results.length}.`); process.exit(1); }
-console.log(`\nВсе ${results.length} проверок прошли.`);
+const total = results.length;
+const word = total % 10 === 1 && total % 100 !== 11 ? 'проверка'
+  : [2, 3, 4].includes(total % 10) && ![12, 13, 14].includes(total % 100) ? 'проверки' : 'проверок';
+console.log(`\nВсе ${total} ${word} прошли.`);
