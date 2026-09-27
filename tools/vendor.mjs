@@ -13,32 +13,32 @@
 import { cpSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { VENDORED_GAMES, UPSTREAM_SOURCES } from './upstream-pins.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const argSrc = process.argv.indexOf('--src');
 const SRC = argSrc !== -1 ? process.argv[argSrc + 1] : join(ROOT, '..', '.tmp-pack');
 const GAMES_DIR = join(ROOT, 'games');
 
+const PACK = 'he-is-talha/html-css-javascript-games';
+const pin = UPSTREAM_SOURCES[PACK];
+
 if (!existsSync(SRC)) {
-  console.error(`Нет исходников: ${SRC}\nСначала: git clone --depth 1 https://github.com/he-is-talha/html-css-javascript-games.git .tmp-pack`);
+  console.error(`Нет исходников: ${SRC}`);
+  console.error(`Зафиксированная ревизия донора: ${pin.sha}`);
+  console.error(`\nСклонируйте именно её:`);
+  console.error(`  git clone https://github.com/${PACK}.git .tmp-pack`);
+  console.error(`  git -C .tmp-pack checkout ${pin.sha}`);
+  console.error(`  npm run vendor -- --src .tmp-pack`);
   process.exit(1);
 }
 
-/** id -> папка в паке. Только игры, прошедшие трёхслойный аудит. */
-const GAMES = {
-  merge:    '10-2048-Game',
-  reaction: '35-Whack-A-Mole-Game',
-  snake:    '24-Snake-Game',
-  sapper:   '16-Minesweeper-Game',
-  quiz:     '33-Quiz-Game',
-  echo:     '36-Simon-Says-Game',
-  memory:   '22-Memory-Card-Game',
-  // Вторая волна (2026-09): тот же пакет, те же правила аудита.
-  sudoku:     '06-Sudoku-Game',
-  lights:     '50-Lights-Out-Game',
-  nonogram:   '49-Nonogram-Game',
-  battleship: '48-Battleship-Game',
-};
+/**
+ * id -> папка в пакете. Только игры, прошедшие трёхслойный аудит.
+ * Источник правды — tools/upstream-pins.mjs: там же зафиксированы проверенные
+ * ревизии апстрима, поэтому список игр и их происхождение нельзя рассинхронить.
+ */
+const GAMES = VENDORED_GAMES;
 
 /** Что удалить после копирования — чужие ассеты. */
 const DELETE_ASSETS = {
@@ -877,3 +877,6 @@ for (const [id, srcDir] of Object.entries(GAMES)) {
 }
 
 console.log(`\nПеренесено игр: ${done}. Ассеты чужие удалены, _boot.js встроен.`);
+console.log(`Донор: ${PACK} @ ${pin.sha} (лицензия ${pin.license}, текст ${pin.licenseFile}).`);
+console.log('Затем примените канонические overrides: node tools/vendor-overrides.mjs');
+console.log('И обязательно: npm run check && npm run smoke');
