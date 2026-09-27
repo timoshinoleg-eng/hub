@@ -8,7 +8,8 @@
 
 - PR mergeable, не draft, без незакрытых блокеров review;
 - GitHub Actions `CI` зелёный на точном release SHA;
-- `npm ci && npm run smoke` проходит на Node 20;
+- `npm run verify` проходит на Node 20: lint, контракты, юнит-тесты с порогами
+  покрытия и браузерные тесты на 390×844, 360×640 и десктопте;
 - известен `RELEASE_SHA`; сохранён `PREVIOUS_SHA` предыдущего рабочего релиза;
 - опубликованы реальные policy/offer URLs;
 - Mini App URL и API доступны только по HTTPS;
@@ -21,8 +22,11 @@
 git fetch origin
 git checkout --detach <RELEASE_SHA>
 npm ci
-npm run smoke
+npm run verify
 ```
+
+Первый прогон браузерных тестов на машине требует `npm run test:e2e:install`
+(ставит Chromium). В CI он ставится автоматически.
 
 После smoke production-хосту dev dependencies не нужны:
 
@@ -154,16 +158,35 @@ npm run bot
 - request body limit не выше server contract (`32 KiB`);
 - не проксировать произвольные internal headers;
 - access logs не должны писать request body, `init_data`, Authorization или query secrets;
-- `/stats` и `/export.csv` дополнительно можно ограничить trusted IP/VPN, но Bearer auth остаётся обязательной;
-- rate limiting включить минимум на `/ev`, `/sub`, `/forget`.
+- `/stats` и `/export.csv` дополнительно можно ограничить trusted IP/VPN, но Bearer auth остаётся обязательной.
 
-Стартовый безопасный baseline, который нужно скорректировать по реальным метрикам:
+### Rate limiting теперь в коде
 
-- `/ev`: 120 req/min/IP, burst 40;
-- `/sub`, `/forget`: 20 req/min/IP, burst 5;
-- `/stats`, `/export.csv`: 10 req/min/IP.
+Раньше rate limiting был здесь только пожеланием, а внешнего ingress в `deploy/`
+нет — ограничивать было некому. Теперь лимиты применяет сам server
+(`@fastify/rate-limit`), ключ — адрес соединения, а не `X-Forwarded-For`:
+за ingress несколько хопов, и слепое доверие заголовку позволяло бы обходить
+лимит его перезаписью.
 
-Не блокировать CORS как замену authentication: CORS защищает браузерный origin, но не сервер от прямого HTTP-клиента.
+| Маршрут | По умолчанию | Переменная |
+| --- | --- | --- |
+| `POST /ev` | 120/мин | `HUB_RATE_LIMIT_EV` |
+| `POST /sub` | 20/мин | `HUB_RATE_LIMIT_SUB` |
+| `POST /forget`, `POST /revoke` | 20/мин | `HUB_RATE_LIMIT_FORGET` |
+| `/stats`, `/export.csv`, `/retention/run` | 10/мин | `HUB_RATE_LIMIT_ADMIN` |
+
+Превышение возвращает `429` с `Retry-After` и машиночитаемым телом. Если
+легитимный всплеск упирается в лимит, поднимайте значения env, а не
+отключайте защиту глобально: `HUB_RATE_LIMIT_DISABLED=true` существует только
+для локальной отладки.
+
+Ingress-уровневая защита при этом остаётся полезной: она отсекает трафик
+раньше, чем он дойдёт до Node, и снижает стоимость отказа.
+
+Не блокировать CORS как замену authentication: CORS защищает браузерный origin,
+но не сервер от прямого HTTP-клиента. И не считать rate limiting заменой
+проверке подписи: события без валидного `initData` не попадают в воронку в
+любом случае (см. `TELEMETRY.md`).
 
 ## 6. Post-deploy smoke
 
@@ -172,7 +195,7 @@ npm run bot
 На точном deployed SHA:
 
 ```bash
-npm run smoke
+npm run verify
 ```
 
 Health/API:
@@ -181,6 +204,21 @@ Health/API:
 curl -fsS https://api.example.ru/health
 curl -fsS -H "Authorization: Bearer $HUB_ADMIN_TOKEN" https://api.example.ru/stats
 ```
+
+Retention по умолчанию удаляет события старше 90 дней, а подписчиков — по
+последнему контакту. Ручной прогон и результат:
+
+```bash
+curl -fsS -X POST -H "Authorization: Bearer $HUB_ADMIN_TOKEN" https://api.example.ru/retention/run
+```
+
+Каждое обращение к `/stats`, `/export.csv` и `/retention/run` попадает в server
+logs как `audit: pdata_access`. Отказы авторизации логируются отдельно: серия
+отказов означает попытку перебора `HUB_ADMIN_TOKEN`.
+
+Усечение выгрузки: если в ответе `/export.csv` есть заголовок
+`X-Hub-Export-Truncated: true`, данные неполные, и решение по ним принимать
+нельзя.
 
 ### MAX WebView — обязательно вручную
 
@@ -206,10 +244,12 @@ curl -fsS -H "Authorization: Bearer $HUB_ADMIN_TOKEN" https://api.example.ru/sta
 
 **GO**, если:
 
-- CI green на deployed SHA;
+- CI green на deployed SHA (оба job: gate и браузерный);
 - `/health` показывает Postgres;
 - MAX auth/subscription работают;
 - все включённые игры проходят ручной smoke;
+- retention выполняется по расписанию, `unverified_events` не растёт лавинообразно;
+- в server logs нет серии `audit: pdata_access` с `outcome: denied`;
 - нет P0/P1 ошибок в логах;
 - rollback SHA и DB backup подтверждены.
 
