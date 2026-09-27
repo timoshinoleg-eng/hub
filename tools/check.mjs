@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GAMES as MANIFEST } from '../js/games.js';
+import { OVERRIDE_PAIRS } from './overrides.manifest.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GAMES = join(ROOT, 'games');
@@ -55,21 +56,17 @@ for (const id of readdirSync(GAMES)) {
   console.log(`  ok ${id}`);
 }
 
-for (const [actual, canonical] of [
-  ['games/merge/script.js', 'tools/overrides/merge-script.js'],
-  ['games/merge/index.html', 'tools/overrides/merge-index.html'],
-  ['games/merge/style.css', 'tools/overrides/merge-style.css'],
-  ['games/quiz/index.html', 'tools/overrides/quiz-index.html'],
-  ['games/quiz/script.js', 'tools/overrides/quiz-script.js'],
-  ['games/quiz/style.css', 'tools/overrides/quiz-style.css'],
-  ['games/reaction/index.html', 'tools/overrides/reaction-index.html'],
-  ['games/reaction/style.css', 'tools/overrides/reaction-style.css'],
-  ['games/snake/index.html', 'tools/overrides/snake-index.html'],
-  ['games/snake/style.css', 'tools/overrides/snake-style.css'],
-  ['games/echo/style.css', 'tools/overrides/echo-style.css'],
-  ['games/memory/style.css', 'tools/overrides/memory-style.css'],
-]) {
-  if (readFileSync(join(ROOT, actual), 'utf8') !== readFileSync(join(ROOT, canonical), 'utf8')) {
+// Каждая пара из единого реестра обязана совпадать байт в байт. Раньше
+// vendor-overrides.mjs копировал 20 файлов, а здесь сверялись только 12, из-за
+// чего `npm run vendor` подменял 8 игровых файлов непроверенными копиями, а
+// check оставался зелёным.
+for (const [file, actual] of OVERRIDE_PAIRS) {
+  const canonical = join(ROOT, 'tools', 'overrides', file);
+  if (!existsSync(canonical)) {
+    err(`${file}: отсутствует каноническая копия в tools/overrides/`);
+    continue;
+  }
+  if (readFileSync(join(ROOT, actual), 'utf8') !== readFileSync(canonical, 'utf8')) {
     err(`${actual}: расходится с production override; npm run vendor будет нерепродуцируем`);
   }
 }

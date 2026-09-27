@@ -20,6 +20,8 @@ jobs:
         run: npm ci
       - name: Assets and vendor invariants
         run: npm run check
+      - name: Vendor reproducibility
+        run: npm run smoke:vendor
       - name: Product and playability contract
         run: npm run smoke:product
       - name: UI state contract
