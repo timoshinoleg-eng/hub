@@ -64,7 +64,10 @@ body[data-view="game"] #view-menu{display:none}
 .pstat{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:15px;padding:10px;text-align:center}
 .pstat strong{display:block;font-size:17px;font-variant-numeric:tabular-nums}
 .pstat span{display:block;margin-top:2px;color:var(--mut);font-size:9.5px;line-height:1.2}
-.mfoot{margin-top:20px;color:#6f788c;font-size:10.5px;text-align:center;line-height:1.7}
+/* #6f788c давал 4.43:1 на фоне --bg, то есть чуть ниже порога WCAG 2 AA (4.5:1)
+   для обычного текста. Подвал — это правовая информация, и она обязана быть
+   читаемой, а не «просто приглушённой». Найдено axe-core. */
+.mfoot{margin-top:20px;color:#8f9ab0;font-size:11px;text-align:center;line-height:1.7}
 .mfoot a,.rcard a{color:#a89fff;text-decoration:none;border-bottom:1px solid rgba(168,159,255,.35)}
 
 #view-game{position:fixed;inset:0;display:flex;flex-direction:column;background:#090b14}

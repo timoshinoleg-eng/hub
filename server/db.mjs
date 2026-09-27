@@ -248,7 +248,7 @@ export async function addSubscriber({ user_id, uid_hash, game, chat_id, consentT
     saveJson();
     return true;
   }
-  const r = await pg.query(
+  await pg.query(
     `INSERT INTO hub_subscribers (user_id, uid_hash, game, chat_id, consent_text, consent_at)
      VALUES ($1,$2,$3,$4,$5, now())
      ON CONFLICT (user_id) DO UPDATE

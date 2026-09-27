@@ -17,5 +17,8 @@ server/.smoke*.json
 .DS_Store
 dist/
 coverage/
+test-results/
+playwright-report/
+playwright/.cache/
 .idea/
 .vscode/

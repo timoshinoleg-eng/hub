@@ -12,7 +12,7 @@
  * согласована с фактическим содержимым games/.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GAMES } from '../js/games.js';
@@ -76,6 +76,28 @@ assert.match(license, /Quizzzz/, 'LICENSE отмечает, что логика 
 // Товарные знаки: лицензия на код не покрывает бренды — это должно быть сказано.
 assert.match(notice, /товарн/i, 'NOTICE оговаривает сторонние товарные знаки');
 assert.match(thirdParty, /товарн/i, 'THIRD-PARTY.md оговаривает сторонние бренды');
+
+// ── Вендоренные браузерные модули ────────────────────────────────────────────
+// web-vitals вендорен локально: CDN в WebView означал бы лишнюю точку отказа и
+// лишний preflight, а политика проекта запрещает внешние runtime-ресурсы.
+// Вендор без зафиксированной ревизии и лицензии — та же дыра, что была с играми.
+const vendorDir = join(ROOT, 'js', 'vendor');
+if (existsSync(vendorDir)) {
+  for (const mod of readdirSync(vendorDir)) {
+    const dir = join(vendorDir, mod);
+    if (!statSync(dir).isDirectory()) continue;
+    const lic = join(dir, 'LICENSE');
+    assert.ok(existsSync(lic), `${mod}: вендоренный модуль обязан нести свой LICENSE`);
+    const files = readdirSync(dir).filter((f) => f.endsWith('.js'));
+    assert.ok(files.length > 0, `${mod}: нет исполняемого файла`);
+    for (const f of files) {
+      const body = readFileSync(join(dir, f), 'utf8');
+      // Внешняя загрузка внутри вендоренного модуля означала бы, что
+      // «вендоринг» на самом деле не состоялся.
+      assert.doesNotMatch(body, /import\s*\(\s*['"`]https?:/, `${mod}/${f}: вендоренный модуль не должен тянуть внешние модули`);
+    }
+  }
+}
 
 console.log('licensing contract: ok');
 console.log(`  LICENSE: MIT, собственный код отделён от ${Object.keys(UPSTREAM_SOURCES).length} доноров`);

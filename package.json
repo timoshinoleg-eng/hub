@@ -32,7 +32,15 @@
     "smoke:daily": "node tools/daily.mjs",
     "smoke:duel": "node tools/duel.mjs",
     "smoke:data-protection": "node tools/data-protection.mjs",
-    "smoke:a11y": "node tools/accessibility.mjs"
+    "smoke:a11y": "node tools/accessibility.mjs",
+    "test:unit": "vitest run --config vitest.config.mjs",
+    "test:unit:coverage": "vitest run --config vitest.config.mjs --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "lint": "biome lint --max-diagnostics=200",
+    "lint:fix": "biome check --write --unsafe",
+    "verify": "npm run lint && npm run smoke && npm run test:unit:coverage && npm run test:e2e"
   },
   "engines": {
     "node": ">=20"
@@ -44,6 +52,13 @@
     "pg": "^8.13.0"
   },
   "devDependencies": {
-    "pino-pretty": "^13.0.0"
+    "@axe-core/playwright": "^4.13.0",
+    "@biomejs/biome": "^2.5.14",
+    "@playwright/test": "^1.63.0",
+    "@vitest/coverage-v8": "^5.0.2",
+    "axe-core": "^4.13.0",
+    "pino-pretty": "^13.0.0",
+    "vitest": "^5.0.2",
+    "web-vitals": "^6.2.2"
   }
 }

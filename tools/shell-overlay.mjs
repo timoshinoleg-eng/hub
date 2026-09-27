@@ -26,19 +26,47 @@ assert.match(css, /#overlay\{[^}]*position:fixed/, '#overlay is a position:fixed
 assert.match(css, /#overlay>\*\{pointer-events:auto\}/, 'overlay children capture pointer input');
 assert.match(css, /body\[data-view="menu"\] #view-game\{display:none\}/, 'view switching hides only #view-game, not #overlay');
 
-assert.match(main, /function clearOverlay\(\)/, 'shell exposes a single overlay reset helper');
+// Сигнатура изменилась: clearOverlay теперь принимает параметры (см. a11y-PR),
+// поэтому ищем по имени функции, а не по точному тексту объявления.
+assert.match(main, /function clearOverlay\s*\(/, 'shell exposes a single overlay reset helper');
+
+// Вырезает тело функции по имени, а не по точному тексту объявления: сигнатуры
+// меняются (clearOverlay получила параметры), и жёсткая привязка к строке
+// ломала контракт на ровном месте.
+function functionBody(source, name) {
+  const start = source.search(new RegExp(`(?:async\\s+)?function ${name}\\s*\\(`));
+  if (start === -1) return null;
+  // Сначала пропускаем сигнатуру: у неё могут быть собственные скобки
+  // ({ restoreFocus = true } = {}), и они не являются телом функции.
+  let parens = 0;
+  let i = source.indexOf('(', start);
+  for (; i < source.length; i++) {
+    if (source[i] === '(') parens++;
+    else if (source[i] === ')') { parens--; if (parens === 0) break; }
+  }
+  let depth = 0;
+  let opened = false;
+  for (i++; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '{') { depth++; opened = true; }
+    else if (ch === '}') {
+      depth--;
+      if (opened && depth === 0) return source.slice(start, i + 1);
+    }
+  }
+  return source.slice(start);
+}
 
 // Каждый выход из игрового вида обязан вызывать helper, а не править innerHTML
 // вразнобой — иначе следующий путь забудет про очистку.
-for (const [fn, label] of [
-  ['function backToMenu()', 'backToMenu'],
-  ['function openGame(', 'openGame'],
-  ['function showResult()', 'showResult'],
+for (const [name, label] of [
+  ['backToMenu', 'backToMenu'],
+  ['openGame', 'openGame'],
+  ['showResult', 'showResult'],
 ]) {
-  const start = main.indexOf(fn);
-  assert.notEqual(start, -1, `${label} exists`);
-  const body = main.slice(start, main.indexOf('\nfunction ', start + 1) === -1 ? main.length : main.indexOf('\nfunction ', start + 1));
-  assert.match(body, /clearOverlay\(\)/, `${label} clears the overlay through the helper`);
+  const body = functionBody(main, name);
+  assert.ok(body, `${label} exists`);
+  assert.match(body, /clearOverlay\(/, `${label} clears the overlay through the helper`);
   assert.doesNotMatch(body, /\$\('#overlay'\)\.innerHTML = ''/, `${label} no longer mutates overlay innerHTML directly`);
 }
 
@@ -47,9 +75,10 @@ for (const [fn, label] of [
 const appends = main.match(/\$\('#overlay'\)\.appendChild\(/g) || [];
 assert.ok(appends.length >= 3, 'overlay insertion points remain for tips, banners and dialogs');
 
-// clearOverlay обязан быть безопасна на отсутствующем узле: DOM может быть
+// clearOverlay обязана быть безопасна на отсутствующем узле: DOM может быть
 // недоступен в момент раннего вызова.
-const helper = main.slice(main.indexOf('function clearOverlay()'), main.indexOf('\n}', main.indexOf('function clearOverlay()')));
+const helper = functionBody(main, 'clearOverlay');
+assert.ok(helper, 'clearOverlay exists');
 assert.match(helper, /if \(overlay\)/, 'clearOverlay tolerates a missing overlay node');
 assert.match(helper, /innerHTML = ''/, 'clearOverlay removes all overlay children');
 

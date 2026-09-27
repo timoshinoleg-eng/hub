@@ -1,0 +1,76 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": { "enabled": false, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      "js/**/*.js",
+      "server/**/*.mjs",
+      "bot/**/*.mjs",
+      "tools/**/*.mjs",
+      "tests/**/*.mjs",
+      "*.js",
+      "*.mjs",
+      "!js/vendor/**"
+    ],
+    "ignoreUnknown": true
+  },
+  "formatter": {
+    "enabled": false,
+    "indentStyle": "space",
+    "lineWidth": 120
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noAssignInExpressions": "off",
+        "noExplicitAny": "off"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "useNamingConvention": "off"
+      },
+      "performance": {
+        "noDelete": "off"
+      },
+      "correctness": {
+        "noUnusedVariables": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["js/vendor/**"],
+      "linter": { "enabled": false },
+      "formatter": { "enabled": false }
+    },
+    {
+      "includes": ["tools/vendor.mjs", "tools/vendor-contract.mjs", "tools/provenance.mjs", "tools/product-contract.mjs", "tools/cache-recovery.mjs"],
+      "linter": {
+        "rules": {
+          "suspicious": { "noTemplateCurlyInString": "off" },
+          "style": { "useTemplate": "off" }
+        }
+      }
+    },
+    {
+      "includes": ["js/**", "server/**", "bot/**", "tests/**"],
+      "linter": {
+        "rules": {
+          "style": { "useTemplate": "off" }
+        }
+      }
+    }
+  ]
+}

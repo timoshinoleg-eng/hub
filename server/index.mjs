@@ -192,7 +192,7 @@ export async function buildServer({ logger = true } = {}) {
   // 152-ФЗ ст. 19 нужно регистрировать. Пишем только метаданные доступа: без
   // IP, без user-agent и без тела ответа. Отказ авторизации логируется тоже —
   // именно он важен для обнаружения перебора admin-токена.
-  const audit = (req, action, detail = {}) => {
+  const audit = (_req, action, detail = {}) => {
     const line = JSON.stringify({
       ts: new Date().toISOString(), audit: 'pdata_access', action,
       outcome: 'granted', days: detail.days ?? null,
@@ -202,7 +202,7 @@ export async function buildServer({ logger = true } = {}) {
     // stdout в docker собирается как лог; logger может быть отключён в тестах.
     (app.log ? app.log.info.bind(app.log) : console.log)(line);
   };
-  const auditDenied = (req, action) => {
+  const auditDenied = (_req, action) => {
     const line = JSON.stringify({ ts: new Date().toISOString(), audit: 'pdata_access', action, outcome: 'denied' });
     (app.log ? app.log.warn.bind(app.log) : console.warn)(line);
   };
