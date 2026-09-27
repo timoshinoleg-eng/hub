@@ -1,15 +1,25 @@
 name: CI
 on:
   push:
-    branches: [main, 'fix/**', 'feat/**']
+    branches: [main, 'fix/**', 'feat/**', 'chore/**']
   pull_request:
     branches: [main]
 permissions:
   contents: read
+
+# Отменяем предыдущий прогон для того же ref: иначе на серии пушей в ветку
+# накапливаются устаревшие запуски и статус PR отражает не последний коммит.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # Быстрый gate: контракты без браузера. Запускается первым, потому что
+  # ловит большинство регрессий за секунды, а не минуты.
   smoke:
+    name: smoke + lint + unit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,6 +28,8 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Lint
+        run: npm run lint
       - name: Assets and vendor invariants
         run: npm run check
       - name: Vendor reproducibility
@@ -34,8 +46,10 @@ jobs:
         run: npm run smoke:shell
       - name: Accessibility contract
         run: npm run smoke:a11y
-      - name: Iframe bridge contract
-        run: npm run smoke:bridge
+      - name: Quizzzz integration contract
+        run: npm run smoke:quizzzz
+      - name: MAX cached-shell recovery
+        run: npm run smoke:cache-recovery
       - name: Analytics transport and privacy
         run: npm run smoke:track
       - name: Analytics endpoint resolution
@@ -60,3 +74,34 @@ jobs:
         run: npm run smoke:daily
       - name: Duel logic
         run: npm run smoke:duel
+      - name: Unit tests with coverage thresholds
+        run: npm run test:unit:coverage
+
+  # Браузерные тесты. Медленные, поэтому идут отдельным job и только после
+  # зелёного smoke: не имеет смысла тратить пять минут Chromium, если сломан
+  # контракт без браузера.
+  browser:
+    name: browser (e2e, a11y, visual)
+    needs: smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Browser contracts
+        run: npx playwright test
+      - name: Visual snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-snapshots-${{ github.event.pull_request.head.sha || github.sha }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7

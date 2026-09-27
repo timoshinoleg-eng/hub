@@ -2,7 +2,6 @@
 const storage = new Map();
 let beacon = null;
 let fetched = null;
-let beaconUrl = null;
 Object.defineProperty(globalThis, 'window', { configurable: true, value: {
   HUB_TRACK_ENDPOINT: 'https://hub.example.test/ev', WebApp: { initData: 'signed-max-init-data' },
   __hubStartParam: '', HUB_CONFIG: { notificationsEnabled: true },
@@ -13,14 +12,14 @@ Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
   removeItem: (k) => storage.delete(k),
 } });
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
-  sendBeacon(url, body) { beacon = { url, body }; beaconUrl = url; return true; },
+  sendBeacon(url, body) { beacon = { url, body }; return true; },
 } });
 Object.defineProperty(globalThis, 'location', { configurable: true, value: { search: '', protocol: 'https:' } });
 Object.defineProperty(globalThis, 'fetch', { configurable: true, value: async (url, opts) => {
   fetched = { url, opts }; return { ok: true, status: 200 };
 } });
 
-const { track, setConsent, subscribe, revokeConsent, clearConsent, hasConsent, subscriptionAvailable, dump } =
+const { track, setConsent, subscribe, revokeConsent, hasConsent, subscriptionAvailable, dump } =
   await import(`../js/track.js?transport=${Date.now()}`);
 
 let fails = 0;

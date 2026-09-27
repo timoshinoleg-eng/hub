@@ -9,7 +9,6 @@
  * pg_class) проверяются статически по исходнику: локального Postgres в
  * smoke-окружении нет, а молчаливая проверка «на глаз» ничего не гарантирует.
  */
-import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -68,7 +67,6 @@ ok(db.retentionPolicy().subscribers === 365, 'срок хранения подп
 // purge и должен чистить.
 const FRESH_UID = 'a-freshuidfreshuidfr';
 const OLD_UID = 'a-olduidolduidoldui';
-const ANON = (s) => `a-${s}`;
 writeFileSync(DB_FILE, JSON.stringify({
   events: [
     { uid_hash: OLD_UID, session_id: null, game: 'merge', action: 'open_bot', value: null, sp: '', verified: true, ts: daysAgo(45) },
@@ -98,7 +96,6 @@ ok((await purgeMalformed.purgeExpired()).events === 0, 'некорректный
 process.env.HUB_EVENT_RETENTION_DAYS = '30';
 
 // Подписчик: активный не удаляется, отозванный и «забытый» — удаляется.
-const nowIso = new Date().toISOString();
 writeFileSync(DB_FILE, JSON.stringify({
   events: [],
   subscribers: [

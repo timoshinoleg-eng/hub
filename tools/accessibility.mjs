@@ -110,13 +110,11 @@ assert.equal(bodyNode.dataset.modal, 'true', 'body помечен модальн
 assert.ok(focusCalls > 0, 'фокус перемещается внутрь диалога, а не остаётся на body');
 
 // Escape действительно снимает модальность и чистит оверлей.
-let cleared = false;
 overlayNode.innerHTML = 'placeholder';
 sandbox.onOverlayKeydown({ key: 'Escape', preventDefault: () => {} });
 assert.equal(overlayNode.innerHTML, '', 'Escape очищает содержимое оверлея');
 assert.equal(attrs.role, undefined, 'Escape снимает роль диалога');
 assert.equal(bodyNode.dataset.modal, undefined, 'Escape снимает модальное состояние body');
-assert.ok(cleared === false || true, 'событие клавиатуры после Escape не бросает исключений');
 assert.ok(!listeners.keydown, 'обработчик клавиатуры снят вместе с оверлеем');
 
 console.log('accessibility contract: ok');

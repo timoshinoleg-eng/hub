@@ -74,7 +74,7 @@ export function createBot() {
   // HUB_BOT_WEBHOOK_SECRET, то есть источник достоверен на стороне сервера.
   // Без этой отметки bot_start/bot_pick_game/notify_subscribe выпадали бы из
   // воронки вместе с неподписанным браузерным трафиком.
-  const track = (ctx, action, game) =>
+  const track = (_ctx, action, game) =>
     db.insertEvent({ uid_hash: db.anonId(), game, action, verified: true });
 
   const gameFromPayload = (p) => {

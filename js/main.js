@@ -3,6 +3,7 @@ const v = encodeURIComponent(revision);
 
 const { bridge } = await import(`./bridge.js?v=${v}`);
 const { track, hasConsent, setConsent, subscribe, revokeConsent, clearConsent, subscriptionAvailable, installErrorReporting } = await import(`./track.js?v=${v}`);
+const { installWebVitals } = await import(`./web-vitals.js?v=${v}`);
 const { cardDataUrl, shareText } = await import(`./share.js?v=${v}`);
 const { duelResult } = await import(`./duel.js?v=${v}`);
 const { dailySeed } = await import(`./daily.js?v=${v}`);
@@ -12,7 +13,6 @@ const { challengeIntroText, challengeResultState, dailyHeroState, dailyResultTex
 const { GAMES, byId, visible } = await import(`./games.js?v=${v}`);
 
 const CFG = window.HUB_CONFIG || {};
-const NOTIFICATIONS_ENABLED = CFG.notificationsEnabled === true;
 const SHOW_ALL = new URLSearchParams(location.search).has('all');
 const HUB_NAME = CFG.hubName || 'Игротека';
 const $ = (s) => document.querySelector(s);
@@ -43,7 +43,31 @@ const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1
  */
 let lastOverlayFocus = null;
 const MODAL_ATTRS = ['role', 'aria-modal', 'aria-label'];
-function clearOverlay() {
+
+/**
+ * Куда вернуть фокус после закрытия модального слоя.
+ *
+ * Наивный «элемент, открывший диалог» не работает для карточки результата:
+ * карточка игры живёт в меню, а при старте игры меню скрывается через
+ * display:none, поэтому к моменту открытия результата она уже недоступна и
+ * document.activeElement схлопывается в body. Фокус просто исчезал бы.
+ *
+ * Поэтому цель выбирается явно: оставаясь в игре, пользователь получает фокус
+ * на кнопке возврата, а вернувшись в меню — на карточке текущей игры.
+ */
+function focusReturnTarget() {
+  const inGame = document.body?.dataset?.view === 'game';
+  const back = $('#back');
+  if (inGame && back && back.offsetParent !== null) return back;
+  if (lastOverlayFocus && document.contains(lastOverlayFocus) && lastOverlayFocus.offsetParent !== null) return lastOverlayFocus;
+  const current = state?.game?.id || state?.lastGameId;
+  if (current) {
+    const card = document.querySelector(`.gcard[data-id="${current}"]`);
+    if (card) return card;
+  }
+  return document.querySelector(FOCUSABLE);
+}
+function clearOverlay({ restoreFocus = true } = {}) {
   const overlay = $('#overlay');
   if (overlay) {
     overlay.innerHTML = '';
@@ -54,11 +78,21 @@ function clearOverlay() {
     for (const attr of MODAL_ATTRS) overlay.removeAttribute(attr);
     delete document.body.dataset.modal;
   }
-  if (lastOverlayFocus && document.contains(lastOverlayFocus)) {
-    try { lastOverlayFocus.focus({ preventScroll: true }); } catch { /* элемент мог исчезнуть */ }
-  }
-  lastOverlayFocus = null;
+  // Снятие слушателя обязано стоять ДО возврата. Иначе обработчик клавиатуры
+  // накапливается при каждом открытии оверлея: Escape срабатывал бы N раз, а
+  // ловушка фокуса прогоняла цикл N раз. Нашёл biome (noUnreachable).
   document.removeEventListener('keydown', onOverlayKeydown, true);
+
+  // Восстановление фокуса отделено от очистки не только по смыслу: renderMenu()
+  // пересоздаёт карточки, поэтому фокус, выданный до перерисовки, умирал бы
+  // вместе со старым узлом. backToMenu() поэтому чистит оверлей без фокуса и
+  // возвращает его после renderMenu().
+  const target = restoreFocus ? focusReturnTarget() : null;
+  lastOverlayFocus = null;
+  if (target) {
+    try { target.focus({ preventScroll: true }); } catch { /* элемент мог исчезнуть */ }
+  }
+  return target;
 }
 
 /**
@@ -222,21 +256,32 @@ function openGame(id, challenge = null) {
   offBack = bridge.onBack(backToMenu);
   setTimeout(() => state.game?.id === g.id && showGameTip(g), 500);
 }
+/** Возвращает фокус после перерисовки меню. */
+function restoreFocusAfterRender() {
+  const target = focusReturnTarget();
+  if (target) {
+    try { target.focus({ preventScroll: true }); } catch { /* узел мог исчезнуть */ }
+  }
+}
+
 function backToMenu() {
   offBack();
   offBack = () => {};
-  // Оверлей живёт в отдельном fixed-слое и не скрывается переключением
-  // body[data-view]. Без явной очистки карточка результата, challenge-баннер
-  // или подсказка остаются поверх меню и перехватывают касания.
-  clearOverlay();
-  $('#game-frame').src = 'about:blank';
-  $('#game-score').textContent = '';
+  // Вид и state переключаем ДО очистки оверлея: clearOverlay() вычисляет, куда
+  // вернуть фокус, и если вид ещё игровой, фокус ушёл бы на скрываемую кнопку
+  // бара и потерялся. Карточка результата при этом очищается так же корректно.
   document.body.dataset.view = 'menu';
+  const finishedGame = state.game?.id || null;
   state.game = null;
   state.challenge = null;
   state.score = null;
   state.finishMeta = null;
+  state.lastGameId = finishedGame;
+  clearOverlay({ restoreFocus: false });
+  $('#game-frame').src = 'about:blank';
+  $('#game-score').textContent = '';
   renderMenu();
+  restoreFocusAfterRender();
   track('back_to_menu');
 }
 function onMessage(e) {
@@ -493,7 +538,10 @@ function showConfigBanner() {
 function init() {
   // Ошибки ловим до всего остального, иначе падение в модуле останется
   // невидимым: в MAX WebView нет консоли, есть только пустой экран.
+  // Сначала наблюдатели, потом всё остальное: метрика должна увидеть и
+  // отрисовку меню, и старт первого кадра игры.
   installErrorReporting();
+  installWebVitals();
   bridge.ready();
   bridge.expand();
   renderMenu();
