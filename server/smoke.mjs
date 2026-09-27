@@ -118,8 +118,26 @@ r = await get('/export.csv');
 check('/export.csv закрыт без admin token', r.statusCode === 401, `код ${r.statusCode}`);
 r = await get('/export.csv', admin);
 check('/export.csv доступен администратору', r.statusCode === 200 && r.body.startsWith('ts,uid_hash,session_id,game,action,value,sp'));
-check('/export.csv не содержит сырого user_id', !r.body.includes('555'));
-check('/export.csv содержит HMAC подписанного пользователя', r.body.includes(db.hashUid(555)));
+
+// Проверка приватности идёт по ячейкам, а не по подстроке во всём теле.
+// Прежняя проверка !body.includes('555') искала три цифры где угодно — в
+// timestamp, в hex-псевдониме, в значении счётчика — и падала в зависимости от
+// данных, а не от утечки. Она проходила локально и роняла CI на Ubuntu: одинаковый
+// код, разные timestamp.
+function csvRows(text) {
+  const [head, ...lines] = text.trim().split('\n');
+  const cols = head.split(',');
+  return lines.filter(Boolean).map((line) => {
+    const cells = line.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || [];
+    return Object.fromEntries(cols.map((c, i) => [c, (cells[i] || '').replace(/,$/, '').replace(/^"|"$/g, '').replace(/""/g, '"')]));
+  });
+}
+const rows = csvRows(r.body);
+const rawLeak = rows.filter((row) => Object.values(row).some((v) => String(v).trim() === '555'));
+check('/export.csv не содержит сырого user_id ни в одной ячейке', rawLeak.length === 0, `строк с утечкой: ${rawLeak.length}`);
+check('/export.csv не отдаёт user_id колонкой', !('user_id' in (rows[0] || {})), Object.keys(rows[0] || {}).join(','));
+check('/export.csv содержит HMAC подписанного пользователя', rows.some((row) => row.uid_hash === db.hashUid(555)));
+check('/export.csv отдаёт признак верификации', rows.every((row) => row.verified === 'true' || row.verified === 'false'));
 
 r = await post('/forget', { user_id: 555 });
 check('/forget не принимает self-asserted user_id', r.statusCode === 401, `код ${r.statusCode}`);
