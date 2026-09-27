@@ -111,3 +111,45 @@ body[data-view="game"] #view-menu{display:none}
 @media (max-width:350px){.game-grid{grid-template-columns:1fr}.gcard{min-height:128px}.hero-head p{display:none}}
 @media (min-width:540px){#view-menu{padding-left:20px;padding-right:20px}.game-grid{gap:12px}.gcard{min-height:164px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+
+/* ── Доступность ───────────────────────────────────────────────────────── */
+
+/* Раньше :focus-visible не встречался ни в hub.css, ни в polish.css, поэтому
+   при навигации с клавиатуры фокус был не виден вообще. */
+:where(button, a, [tabindex]):focus-visible {
+  outline: 2px solid #8ea2ff;
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+.icon-btn:focus-visible, .result-link:focus-visible { outline-offset: 3px; }
+
+/* Минимальная область касания — 44px (WCAG 2.5.5 Target Size). Иконки бара были
+   42px, текстовые ссылки в подвале — по 9px высотой. */
+.icon-btn { min-width: 44px; min-height: 44px; }
+.result-link { min-height: 44px; display: inline-flex; align-items: center; }
+.daily-play { min-height: 44px; }
+
+/* Полоса прокрутки внутри меню не должна ловивать касания, иначе свайп по
+   списку карточек прокручивает, а не играет. */
+.game-grid { -webkit-overflow-scrolling: touch; }
+
+/* Баннер ограниченного режима: показывается, когда конфигурация неполна
+   (например, не задан HUB_CONFIG.bot, и ссылки-челленджи не работают). */
+.config-warn {
+  margin: 0 0 18px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 199, 96, .34);
+  border-radius: 14px;
+  background: rgba(255, 199, 96, .09);
+  color: #ffd489;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.config-warn b { display: block; margin-bottom: 4px; font-size: 12px; }
+.config-warn ul { margin: 0; padding-left: 16px; }
+.config-warn li { margin-top: 2px; }
+
+/* Оверлей как модальный слой: раньше у карточки результата не было ни роли,
+   ни фокус-ловушки, ни закрытия по Escape. */
+.result { align-items: center; }
+.rcard { max-height: calc(100dvh - 32px - var(--safe-bottom) - var(--safe-top)); overflow-y: auto; }

@@ -32,6 +32,8 @@ jobs:
         run: npm run smoke:ui-state
       - name: Shell overlay contract
         run: npm run smoke:shell
+      - name: Accessibility contract
+        run: npm run smoke:a11y
       - name: Iframe bridge contract
         run: npm run smoke:bridge
       - name: Analytics transport and privacy
@@ -50,6 +52,8 @@ jobs:
         run: npm run smoke:progress
       - name: Server contracts
         run: npm run smoke:server
+      - name: Data protection, retention and rate limits
+        run: npm run smoke:data-protection
       - name: Bot contracts
         run: npm run smoke:bot
       - name: Daily determinism

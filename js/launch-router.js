@@ -1,4 +1,13 @@
-import { bridge } from './bridge.js';
+// Импорт намеренно версионный, как и весь остальной исполняемый граф оболочки.
+// Это единственный статический импорт в лаунчере, и без query он кешировался
+// между запусками: после релиза MAX WebView мог подсунуть старый bridge.js
+// вместе с новым main.js. Именно этот класс багов породил семь из
+// семнадцати коммитов репозитория.
+//
+// Ревизия читается через globalThis, а не через window: модуль импортируется
+// и из Node в tools/quizzzz-integration.mjs, где window не существует.
+const REVISION = encodeURIComponent(globalThis.window?.HUB_ASSET_REVISION || '');
+const { bridge } = await import(`./bridge.js?v=${REVISION}`);
 
 const QUIZZZZ_EXACT = new Set(['daily', 'league', 'leaderboard', 'challenge_new']);
 const SAFE_START = /^[A-Za-z0-9_-]{1,512}$/;
