@@ -90,6 +90,7 @@ body[data-view="game"] #view-menu{display:none}
 .rbest{font-size:11.5px;color:#c3cad8;margin-bottom:13px}
 .rduel,.rdaily{font-size:12.5px;font-weight:750;margin-bottom:12px;padding:8px 10px;border-radius:12px}
 .rduel.win,.rdaily{background:rgba(91,226,140,.11);color:#79efa4}
+.rduel.tie{background:rgba(255,199,96,.12);color:#ffc760}
 .rduel.lose{background:rgba(255,107,119,.12);color:#ff8992}
 .rrow{display:flex;gap:9px;margin-bottom:9px}
 .btn{flex:1;min-height:48px;padding:11px 13px;border-radius:14px;border:1px solid var(--line);background:#1b2234;color:var(--ink);font-weight:750;cursor:pointer}

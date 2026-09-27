@@ -8,6 +8,7 @@ const { duelResult } = await import(`./duel.js?v=${v}`);
 const { dailySeed } = await import(`./daily.js?v=${v}`);
 const { observeVisit } = await import(`./engagement.js?v=${v}`);
 const { getGameProgress, getSummary, recordFinish } = await import(`./progress.js?v=${v}`);
+const { challengeIntroText, challengeResultState, dailyHeroState, dailyResultText, recordBadgeText } = await import(`./ui-state.js?v=${v}`);
 const { GAMES, byId, visible } = await import(`./games.js?v=${v}`);
 
 const CFG = window.HUB_CONFIG || {};
@@ -66,14 +67,15 @@ function renderMenu() {
 
   if (daily) {
     const pg = getGameProgress(daily.id);
+    const hero = dailyHeroState(pg, today, summary.completedToday);
     $('#daily-card').innerHTML =
       `<div class="daily-card" style="--d1:${daily.accent};--d2:${daily.accent2}">` +
         `<div class="daily-top"><span class="daily-label">✦ ВЫЗОВ ДНЯ</span>` +
-        `<span class="daily-status">${summary.completedToday ? '✓ серия сохранена' : 'новый шанс сегодня'}</span></div>` +
+        `<span class="daily-status">${esc(hero.status)}</span></div>` +
         `<div class="daily-main"><div class="daily-emoji">${iconSvg(daily.icon, 'daily-icon')}</div>` +
         `<div class="daily-copy"><h2>${esc(daily.title)}</h2>` +
         `<p>${esc(daily.tagline)} · ${esc(formatBest(daily, pg.best))}</p></div></div>` +
-        `<button class="daily-play" id="daily-play">${summary.completedToday ? 'Сыграть ещё раз' : 'Играть сейчас'}</button>` +
+        `<button class="daily-play" id="daily-play">${esc(hero.cta)}</button>` +
       `</div>`;
     $('#daily-play').onclick = () => openGame(daily.id);
   }
@@ -215,17 +217,19 @@ function showResult() {
   const score = state.score ?? 0;
   const meta = state.finishMeta || {};
   const link = deepLink(g.id, score);
-  const duel = duelResult(score, state.challenge, g.cfg?.higherIsBetter !== false);
+  const higherIsBetter = g.cfg?.higherIsBetter !== false;
+  const duel = duelResult(score, state.challenge, higherIsBetter);
+  const duelState = challengeResultState(duel, higherIsBetter);
   const box = el('div', 'result');
 
-  const duelLine = duel
-    ? `<div class="rduel ${duel.won ? 'win' : 'lose'}">${duel.won ? '🏆 Челлендж выигран!' : 'До победы не хватило совсем немного'}</div>`
+  const duelLine = duelState
+    ? `<div class="rduel ${duelState.kind}">${esc(duelState.text)}</div>`
     : '';
   if (duel) track(duel.won ? 'duel_win' : 'duel_lose', g.id, score);
 
-  const dailyLine = meta.dailyAdvanced
-    ? `<div class="rdaily">Серия продлена: ${meta.streak} ${meta.streak === 1 ? 'день' : 'дн.'}</div>`
-    : '';
+  const dailyText = dailyResultText(meta);
+  const dailyLine = dailyText ? `<div class="rdaily">${esc(dailyText)}</div>` : '';
+  const recordBadge = recordBadgeText(meta);
 
   const offerNotify = shouldOfferNotify(dailySeed());
   if (offerNotify) markNotifyPrompted();
@@ -233,7 +237,7 @@ function showResult() {
   box.innerHTML =
     `<div class="rcard" style="--result-glow:${g.accent || '#6d5cff'}">` +
       `${meta.newBest ? confettiHtml() : ''}` +
-      `${meta.newBest ? '<div class="record-pill">✦ НОВЫЙ РЕКОРД</div>' : ''}` +
+      `${recordBadge ? `<div class="record-pill">${esc(recordBadge)}</div>` : ''}` +
       `<div class="result-icon-wrap">${iconSvg(g.icon, 'result-icon')}</div>` +
       `<div class="rttl">${esc(g.title)}</div>` +
       `<div class="result-score">${score}${g.unit ? ` <span style="font-size:14px;letter-spacing:0">${esc(g.unit)}</span>` : ''}</div>` +
@@ -334,10 +338,8 @@ function init() {
     openGame(sp.game.id, sp.challenge);
     if (sp.challenge != null) {
       const higher = sp.game.cfg?.higherIsBetter !== false;
-      const txt = higher
-        ? `Челлендж: набери больше ${sp.challenge}${sp.game.unit ? ' ' + sp.game.unit : ''} 🎯`
-        : `Челлендж: уложись в ${sp.challenge}${sp.game.unit ? ' ' + sp.game.unit : ''} 🎯`;
-      const n = el('div', 'challenge', txt);
+      const txt = challengeIntroText(sp.challenge, higher, sp.game.unit || '');
+      const n = el('div', 'challenge', esc(txt));
       $('#overlay').appendChild(n);
       setTimeout(() => n.remove(), 4000);
     }

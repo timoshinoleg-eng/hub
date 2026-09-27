@@ -48,6 +48,15 @@ assert.ok(hub.includes('✦ СЕГОДНЯ'), 'daily badge is localized');
 assert.ok(hub.includes('result-icon-wrap') && !hub.includes('<div class="result-emoji">'), 'result loop uses local vector identity');
 assert.ok(hub.includes('hub_notify_prompted_v1'), 'subscription prompt is rate-limited instead of persistent');
 
+// UI state вынесен в чистый тестируемый модуль, а не собран инлайном в оболочке.
+assert.ok(hub.includes('await import(`./ui-state.js?v=${v}`)'), 'hub loads versioned ui-state module');
+for (const fn of ['dailyHeroState', 'recordBadgeText', 'dailyResultText', 'challengeResultState', 'challengeIntroText']) {
+  assert.ok(hub.includes(`${fn}(`), `ui-state ${fn} is actually wired into the shell`);
+}
+// Ничья не должна рендериться как победа, иначе текст врёт пользователю.
+assert.ok(!hub.includes('🏆 Челлендж выигран!'), 'challenge result copy comes from ui-state, not a hardcoded win banner');
+assert.ok(hub.includes("duelState.kind"), 'challenge result distinguishes win/tie/lose');
+
 for (const token of ['daily-card', 'game-grid', 'record-pill', 'game-tip', 'confetti']) {
   assert.ok(hubCss.includes(token), `shell keeps ${token} visual layer`);
 }
