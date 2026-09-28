@@ -29,15 +29,20 @@ export default defineConfig({
       // и сервер покрыты браузерными тестами и smoke-наборами, и включать их
       // сюда было бы фиктивным покрытием: строки исполнялись бы, но проверок
       // поведения не добавлялось.
-      include: [
-        'js/daily.js',
-        'js/duel.js',
-        'js/progress.js',
-        'js/engagement.js',
-        'js/ui-state.js',
-        'js/quizzzz-routing.js',
-        'js/games.js',
-      ],
+    include: [
+      'js/daily.js',
+      'js/duel.js',
+      'js/progress.js',
+      'js/engagement.js',
+      'js/ui-state.js',
+      'js/quizzzz-routing.js',
+      'js/games.js',
+      // Физика brick — единственный модуль игры, вынесенный в чистую
+      // функцию и покрытый unit-тестами, поэтому её измеряем наравне с
+      // остальным: иначе пороги молча игнорировали бы самый опасный
+      // участок кода в brick.
+      'games/brick/physics.js',
+    ],
       thresholds: {
         lines: 85,
         functions: 90,

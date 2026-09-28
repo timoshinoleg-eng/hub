@@ -106,10 +106,16 @@ assert.ok(battleship.includes('pickParityCell'), 'battleship keeps AI levels');
 assert.ok(battleship.includes('__hubShots++'), 'battleship reports player shots as score');
 assert.ok(battleship.includes('occupiedShipId'), 'battleship allows tap-to-remove placed ship');
 const brick = read('games/brick/game.js');
-assert.ok(brick.includes('hubFinish(score)') && brick.includes('touchMoveHandler'), 'brick reports score/finish and keeps touch controls');
+// Проверки регулярками, а не поиском литералов: состояние brick вынесено в
+// world из physics.js, поэтому литерал `hubFinish(score)` потребовал бы
+// вернуть отдельную переменную score только ради текста. Смысл инварианта —
+// «игра сообщает очки и завершение, а touch слушает только canvas» — от
+// имени переменной и от кавычек не зависит.
+assert.ok(/hubFinish\([^)]*score/i.test(brick), 'brick reports score/finish');
+assert.ok(brick.includes('touchMoveHandler'), 'brick keeps touch controls');
 assert.ok(brick.includes('layoutBricks'), 'brick scales brick geometry to canvas width');
-assert.ok(brick.includes('canvas.addEventListener("touchstart"'), 'brick listens touch on canvas only');
-assert.ok(!brick.includes('document.addEventListener("touchstart"'), 'brick must not swallow global touchstart');
+assert.ok(/canvas\.addEventListener\(\s*['"]touchstart['"]/.test(brick), 'brick listens touch on canvas only');
+assert.ok(!/document\.addEventListener\(\s*['"]touchstart['"]/.test(brick), 'brick must not swallow global touchstart');
 assert.ok(!brick.includes('confirm('), 'brick must not rely on confirm (stubbed by _boot.js)');
 
 console.log('product/playability contract: ok');

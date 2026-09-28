@@ -311,6 +311,91 @@ test.describe('каждая включённая игра', () => {
   }
 });
 
+test.describe('brick: игровой цикл', () => {
+  // Общий цикл загрузки выше только открывает игру — цикл кадра и пауза
+  // остаются непроверенными. Проверяем их по пикселям холста, чтобы не
+  // добавлять в production-код тестовые хуки: их в репозитории нет, а
+  // состояние мира намеренно спрятано в замыкание.
+  //
+  // Независимость физики от частоты кадров и списание жизни проверяются
+  // детерминированно в tests/unit/brick-physics.test.mjs: измерять их через
+  // подмену requestAnimationFrame в headless означало бы завязать тест на
+  // тайминги браузера.
+  const startRound = async (page) => {
+    await stubMax(page);
+    await openMenu(page, { config: PROD_CONFIG });
+    await openGame(page, 'brick');
+    const frame = page.frameLocator('#game-frame');
+    // На первом мобильном визите игра показывает гайд по касанию поверх меню.
+    // Это поведение оригинала, и живой пользователь его закрывает, поэтому
+    // тест делает то же самое, а не обходит оверлей.
+    const guide = frame.locator('#touchGuide');
+    if (await guide.isVisible()) await frame.locator('#touchGuideBtn').click();
+    await frame.locator('#startGameBtn').click();
+    await expect(frame.locator('#startMenu')).toBeHidden();
+    // Проверяем кнопку, а не контейнер #gameMenu: .game-ui внутри — это
+    // position: fixed, поэтому у контейнера нет размеров, и он остаётся
+    // «пустым» для Playwright, хотя кнопки на экране есть. Класс hidden даёт
+    // display: none !important, так что проверка кнопки отличает игру от меню.
+    await expect(frame.locator('#pauseBtn')).toBeVisible();
+    return frame;
+  };
+
+  // Отпечаток холста вместо toDataURL(): PNG с deviceScaleFactor 2 — это
+  // мегабайты base64 на каждый замер, и при параллельном прогоне трёх
+  // вьюпортов это роняло браузер. Здесь считается хеш по пикселям с шагом
+  // 4px — дёшево и ровно так же чувствительно к движению мяча.
+  const fingerprint = (frame) => frame.locator('#gameCanvas').evaluate((canvas) => {
+    const ctx = canvas.getContext('2d');
+    const { width, height } = canvas;
+    const data = ctx.getImageData(0, 0, width, height).data;
+    let hash = 0;
+    for (let y = 0; y < height; y += 4) {
+      for (let x = 0; x < width; x += 4) {
+        hash = (Math.imul(hash, 31) + data[(y * width + x) * 4]) | 0;
+      }
+    }
+    return hash;
+  });
+
+  test('раунд стартует, анимация идёт и останавливается на паузе', async ({ page }) => {
+    const errors = watchErrors(page);
+    const frame = await startRound(page);
+
+    // Кадры различаются: цикл кадра живёт, мяч и частицы двигаются.
+    const first = await fingerprint(frame);
+    await page.waitForTimeout(500);
+    const second = await fingerprint(frame);
+    expect(second, 'холст не меняется — цикл кадра не работает').not.toBe(first);
+
+    // Пауза обязана остановить отрисовку полностью.
+    await frame.locator('#pauseBtn').click();
+    await expect(frame.locator('#pauseMenu')).toBeVisible();
+    const pausedA = await fingerprint(frame);
+    await page.waitForTimeout(500);
+    const pausedB = await fingerprint(frame);
+    expect(pausedB, 'на паузе холст продолжает перерисовываться').toBe(pausedA);
+
+    // Продолжение возвращает анимацию.
+    await frame.locator('#resumeBtn').click();
+    await expect(frame.locator('#pauseMenu')).toBeHidden();
+    await page.waitForTimeout(500);
+    expect(await fingerprint(frame), 'после продолжения холст замер').not.toBe(pausedB);
+
+    const fatal = errors.filter((e) => !e.includes('st.max.ru'));
+    expect(fatal, `brick ошибки:\n${fatal.join('\n')}`).toEqual([]);
+  });
+
+  test('Escape ставит игру на паузу, а меню возвращает в главное', async ({ page }) => {
+    const frame = await startRound(page);
+    await frame.locator('#gameCanvas').press('Escape');
+    await expect(frame.locator('#pauseMenu')).toBeVisible();
+    await frame.locator('#backToMainMenuBtn').click();
+    await expect(frame.locator('#startMenu')).toBeVisible();
+    await expect(frame.locator('#pauseMenu')).toBeHidden();
+  });
+});
+
 test.describe('аналитика', () => {
   test('до согласия события не несут MAX identity', async ({ page }) => {
     const payloads = [];

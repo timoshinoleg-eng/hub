@@ -1,1035 +1,609 @@
-// 立即执行初始化
-(function() {
-    console.log('Immediate initialization...');
-    
-    // 等待DOM准备好
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupInitialState);
-    } else {
-        setupInitialState();
-    }
-    
-    function setupInitialState() {
-        console.log('Setting up initial state...');
-        
-        // 强制显示开始菜单
-        setTimeout(() => {
-            const startMenu = document.getElementById('startMenu');
-            if (startMenu) {
-                startMenu.classList.remove('hidden');
-                startMenu.classList.add('active');
-                console.log('Start menu forced to show with active class');
-            }
-            
-            // 强制隐藏其他菜单
-            const menusToHide = ['pauseMenu', 'instructionsMenu', 'highScoreMenu', 'gameMenu'];
-            menusToHide.forEach(menuId => {
-                const menu = document.getElementById(menuId);
-                if (menu) {
-                    menu.classList.remove('active');
-                    menu.classList.add('hidden');
-                    console.log('Hidden menu:', menuId);
-                }
-            });
-        }, 50);
-    }
-})();
+/**
+ * Кирпичи — оболочка над чистой физикой из physics.js.
+ *
+ * Разделение появилось не по вкусу, а по необходимости. Раньше физика,
+ * отрисовка и планирование кадра жили в одной функции draw(), поэтому её нельзя
+ * было ни протестировать без браузера, ни починить: движение мяча не зависело
+ * от времени (x += 4 раз за кадр), и на 30 Гц игра шла вдвое медленнее, чем на
+ * 60 Гц. В MAX WebView на горящем телефоне частота кадров проседает, и это был
+ * не теоретический, а наблюдаемый дефект. Теперь считает physics.js, здесь
+ * остаётся только ввод, отрисовка, звук и меню.
+ *
+ * Всё состояние игры — в world из physics.js. Здесь нет ни x, ни y, ни dx:
+ * если бы они появились, физика снова начала бы расходиться с отрисовкой.
+ */
+(function () {
+'use strict';
 
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const physics = window.__hubBrickPhysics;
 
-// 设备和屏幕检测
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 const isSmallScreen = () => window.innerWidth < 768;
 const isVerySmallScreen = () => window.innerWidth < 480;
 
-// 响应式 Canvas 尺寸配置
+// ── Размер холста ───────────────────────────────────────────────────────────
+// Поле 4:3, как в оригинале. Размер выводится из окна, чтобы на телефоне
+// холст не занимал меньше трети экрана.
 function getOptimalCanvasSize() {
-    const maxWidth = window.innerWidth - 40; // 留边距
-    const maxHeight = window.innerHeight - 40;
-
-    // 默认比例 4:3
-    const aspectRatio = 4 / 3;
-
-    let width, height;
-
-    if (isVerySmallScreen()) {
-        // 超小屏幕：使用更小的尺寸
-        width = Math.min(320, maxWidth);
-        height = Math.min(240, maxHeight);
-    } else if (isSmallScreen()) {
-        // 小屏幕：中等尺寸
-        width = Math.min(480, maxWidth);
-        height = Math.min(360, maxHeight);
-    } else {
-        // 桌面：原始尺寸
-        width = Math.min(800, maxWidth);
-        height = Math.min(600, maxHeight);
-    }
-
-    // 确保保持宽高比
-    if (width / height > aspectRatio) {
-        width = height * aspectRatio;
-    } else {
-        height = width / aspectRatio;
-    }
-
-    return { width: Math.floor(width), height: Math.floor(height) };
+  const maxWidth = window.innerWidth - 40;
+  const maxHeight = window.innerHeight - 40;
+  const aspect = 4 / 3;
+  let width;
+  let height;
+  if (isVerySmallScreen()) {
+    width = Math.min(320, maxWidth);
+    height = Math.min(240, maxHeight);
+  } else if (isSmallScreen()) {
+    width = Math.min(480, maxWidth);
+    height = Math.min(360, maxHeight);
+  } else {
+    width = Math.min(800, maxWidth);
+    height = Math.min(600, maxHeight);
+  }
+  if (width / height > aspect) width = height * aspect;
+  else height = width / aspect;
+  return { width: Math.floor(width), height: Math.floor(height) };
 }
 
-// 调整 Canvas 尺寸
-function resizeCanvas() {
-    // 安全检查：确保 canvas 元素存在
-    if (!canvas) {
-        console.error('Canvas element not found');
-        return;
-    }
+const BRICK_ROWS = 5;
+const BRICK_COLUMNS = 9;
 
-    const size = getOptimalCanvasSize();
-    const oldWidth = canvas.width;
-    const oldHeight = canvas.height;
+// ── Мир и состояние ─────────────────────────────────────────────────────────
+let world = null;
+let gameState = 'menu'; // 'menu' | 'playing' | 'paused'
+let animationId = null;
+let lastFrameTime = 0;
 
-    // 更新 canvas 尺寸
-    canvas.width = size.width;
-    canvas.height = size.height;
+const tailParticles = [];
+const BRICK_COLORS = [
+  ['#ff6b6b', '#ff5252'],
+  ['#4ecdc4', '#26a69a'],
+  ['#45b7d1', '#2196f3'],
+  ['#96ceb4', '#66bb6a'],
+  ['#feca57', '#ffb74d'],
+];
 
-    // Пересчитываем геометрию кирпичей/платформы под новый размер
-    layoutBricks();
-
-    // 如果游戏正在进行，需要重新缩放游戏元素
-    if (gameState === 'playing' && oldWidth !== size.width) {
-        const scaleX = size.width / oldWidth;
-        const scaleY = size.height / oldHeight;
-
-        // 缩放球的位置
-        x = x * scaleX;
-        y = y * scaleY;
-
-        // 缩放挡板位置
-        paddleX = paddleX * scaleX;
-
-        // 重新初始化砖块位置（通过下次绘制自动更新）
-    }
-
-    console.log(`Canvas resized to ${size.width}x${size.height}`);
-}
-
-// 性能配置：根据设备调整粒子效果
 const performanceConfig = {
-    maxParticles: isSmallScreen() ? 50 : 100,  // 移动端减少粒子数量
-    particleGenerationRate: isSmallScreen() ? 0.5 : 1,  // 移动端降低生成频率
-    explosionParticleCount: isVerySmallScreen() ? 8 : (isSmallScreen() ? 10 : 15)  // 爆炸粒子数量
+  maxParticles: isSmallScreen() ? 50 : 100,
+  particleGenerationRate: isSmallScreen() ? 0.5 : 1,
+  explosionParticleCount: isVerySmallScreen() ? 8 : (isSmallScreen() ? 10 : 15),
 };
 
-// 屏幕方向检测和提示
-function checkOrientation() {
-    if (!isMobile) return;
-
-    const orientationWarning = document.getElementById('orientationWarning');
-    if (!orientationWarning) return;
-
-    // Геометрия масштабируется под любую ширину (layoutBricks),
-    // поэтому portrait не блокируем — предупреждение больше не показываем.
-    orientationWarning.classList.add('hidden');
+function buildWorld() {
+  const size = getOptimalCanvasSize();
+  canvas.width = size.width;
+  canvas.height = size.height;
+  world = physics.createWorld({
+    width: size.width,
+    height: size.height,
+    brickRows: BRICK_ROWS,
+    brickColumns: BRICK_COLUMNS,
+  });
+  physics.layoutBricks(world);
+  physics.serveBall(world, 0);
+  return world;
 }
 
-// 触摸指引管理
-function showTouchGuide() {
-    if (!isMobile) return;
-
-    // 检查是否已显示过触摸指引
-    const hasSeenGuide = localStorage.getItem('hasSeenTouchGuide');
-
-    if (!hasSeenGuide) {
-        const touchGuide = document.getElementById('touchGuide');
-        if (touchGuide) {
-            touchGuide.classList.remove('hidden');
-
-            // 添加"知道了"按钮事件
-            const touchGuideBtn = document.getElementById('touchGuideBtn');
-            if (touchGuideBtn) {
-                touchGuideBtn.onclick = () => {
-                    touchGuide.classList.add('hidden');
-                    localStorage.setItem('hasSeenTouchGuide', 'true');
-                };
-            }
-        }
-    }
-}
-
-// 监听屏幕方向变化
-window.addEventListener('orientationchange', () => {
-    setTimeout(checkOrientation, 100);
-});
-
-window.addEventListener('resize', () => {
-    checkOrientation();
-});
-
-// 音效系统
-const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-// 音效函数
-function playSound(frequency, duration, type = 'sine', volume = 0.3) {
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    oscillator.type = type;
-    
-    gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-    
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + duration);
-}
-
-function playBrickHitSound() {
-    playSound(800, 0.1, 'square', 0.2);
-    setTimeout(() => playSound(600, 0.1, 'square', 0.15), 50);
-}
-
-function playPaddleHitSound() {
-    playSound(200, 0.2, 'sawtooth', 0.3);
-}
-
-function playVictorySound() {
-    playSound(523, 0.3, 'sine', 0.4);
-    setTimeout(() => playSound(659, 0.3, 'sine', 0.4), 150);
-    setTimeout(() => playSound(784, 0.3, 'sine', 0.4), 300);
-    setTimeout(() => playSound(1047, 0.5, 'sine', 0.4), 450);
-}
-
-function playGameOverSound() {
-    playSound(400, 0.5, 'sawtooth', 0.3);
-    setTimeout(() => playSound(300, 0.5, 'sawtooth', 0.3), 200);
-    setTimeout(() => playSound(200, 0.8, 'sawtooth', 0.3), 400);
-}
-
-// 背景音乐
-let backgroundMusicPlaying = false;
-function playBackgroundMusic() {
-    if (!backgroundMusicPlaying) {
-        backgroundMusicPlaying = true;
-        const playMelody = () => {
-            const melody = [262, 294, 330, 349, 392, 440, 494, 523];
-            let noteIndex = 0;
-            
-            const playNote = () => {
-                if (backgroundMusicPlaying) {
-                    playSound(melody[noteIndex], 0.8, 'sine', 0.1);
-                    noteIndex = (noteIndex + 1) % melody.length;
-                    setTimeout(playNote, 1000);
-                }
-            };
-            playNote();
-        };
-        playMelody();
-    }
-}
-
-let ballRadius = 10;
-let x = 0;
-let y = 0;
-let dx = 0;
-let dy = 0;
-
-let paddleHeight = 10;
-let paddleWidth = 75;
-let paddleX = (canvas.width - paddleWidth) / 2;
-
-let rightPressed = false;
-let leftPressed = false;
-
-const brickRowCount = 5;
-const brickColumnCount = 9;
-// Геометрия вычисляется от ширины canvas (layoutBricks), чтобы всё поле
-// помещалось на мобильном экране и каждый кирпич был достижим для мяча.
-let brickWidth = 75;
-let brickHeight = 20;
-let brickPadding = 10;
-let brickOffsetTop = 30;
-let brickOffsetLeft = 30;
-
+/** Пересобирает кирпичи под новый размер холста. Токены сохранены: на них
+ *  завязан продуктовый контракт и ручная проверка геометрии. */
 function layoutBricks() {
-    const w = canvas.width;
-    const h = canvas.height;
-    brickPadding = Math.max(4, Math.round(w * 0.012));
-    const side = Math.max(8, Math.round(w * 0.04));
-    brickOffsetLeft = side;
-    brickWidth = (w - side * 2 - (brickColumnCount - 1) * brickPadding) / brickColumnCount;
-    brickHeight = Math.max(14, Math.min(24, Math.round(h * 0.035)));
-    brickOffsetTop = Math.max(24, Math.round(h * 0.06));
-    paddleWidth = Math.max(48, Math.round(w * 0.2));
-    paddleX = Math.max(0, Math.min(w - paddleWidth, paddleX));
+  if (!world) return buildWorld();
+  physics.layoutBricks(world);
+  return world;
 }
 
-let bricks = [];
-for (let c = 0; c < brickColumnCount; c++) {
-    bricks[c] = [];
-    for (let r = 0; r < brickRowCount; r++) {
-        bricks[c][r] = { x: 0, y: 0, status: 1 };
-    }
+function resizeCanvas() {
+  if (!canvas) return;
+  const oldWidth = world ? world.width : 0;
+  const size = getOptimalCanvasSize();
+  canvas.width = size.width;
+  canvas.height = size.height;
+  buildWorld();
+  if (gameState === 'playing') physics.serveBall(world, 0);
+  if (oldWidth && oldWidth !== size.width) tailParticles.length = 0;
 }
 
-let score = 0;
-let lives = 3;
-
-// Хаб: метрики и финиш (протокол _boot.js)
+// ── Интеграция с оболочкой хаба ────────────────────────────────────────────
 let __hubDone = false;
-function hubScore(s) { window.parent.postMessage({ __hub: 1, type: "score", value: s }, "*"); }
-function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.postMessage({ __hub: 1, type: "finish", score: s }, "*"); }
+function hubScore(s) { window.parent.postMessage({ __hub: 1, type: 'score', value: s }, '*'); }
+function hubFinish(s) { if (__hubDone) return; __hubDone = true; window.parent.postMessage({ __hub: 1, type: 'finish', score: s }, '*'); }
 
+// ── Ассеты ─────────────────────────────────────────────────────────────────
 const starImage = new Image();
 starImage.src = 'start.svg';
-
 const paddleImage = new Image();
 paddleImage.src = 'deer.svg';
 
-const tailParticles = [];  // For storing meteor tail particles
-
-// 振动反馈功能
 function vibrateDevice(duration = 10) {
-    if (isMobile && 'vibrate' in navigator) {
-        navigator.vibrate(duration);
-    }
+  if (isMobile && 'vibrate' in navigator) navigator.vibrate(duration);
 }
 
-// 改进的触摸位置计算
-function getTouchPosition(touch) {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const relativeX = (touch.clientX - rect.left) * scaleX;
-    return relativeX;
+// ── Звук ───────────────────────────────────────────────────────────────────
+let audioContext = null;
+try {
+  audioContext = new (window.AudioContext || window.webkitAudioContext)();
+} catch { /* без звука играть можно */ }
+
+function playSound(frequency, duration, type = 'sine', volume = 0.3) {
+  if (!audioContext || audioContext.state === 'suspended') return;
+  try {
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    gain.gain.setValueAtTime(volume, audioContext.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioContext.destination);
+    osc.start();
+    osc.stop(audioContext.currentTime + duration);
+  } catch { /* звук не должен ронять игру */ }
 }
 
-// 鼠标和触摸事件处理
-document.addEventListener("mousemove", mouseMoveHandler, false);
-// Слушаем touch только на canvas: глобальный перехват ломал click-кнопки меню
-canvas.addEventListener("touchmove", touchMoveHandler, { passive: false });
-canvas.addEventListener("touchstart", touchStartHandler, { passive: false });
+const playBrickHitSound = () => playSound(520, 0.08, 'triangle', 0.25);
+const playPaddleHitSound = () => playSound(340, 0.09, 'sine', 0.25);
+const playVictorySound = () => { playSound(660, 0.12, 'sine', 0.3); setTimeout(() => playSound(880, 0.18, 'sine', 0.3), 110); };
+const playGameOverSound = () => { playSound(300, 0.2, 'sawtooth', 0.22); setTimeout(() => playSound(200, 0.3, 'sawtooth', 0.2), 150); };
 
-function mouseMoveHandler(e) {
-    if (gameState !== 'playing') return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const relativeX = (e.clientX - rect.left) * scaleX;
-
-    if (relativeX > 0 && relativeX < canvas.width) {
-        paddleX = Math.max(0, Math.min(canvas.width - paddleWidth, relativeX - paddleWidth / 2));
-    }
+let backgroundMusicPlaying = false;
+function playBackgroundMusic() {
+  if (!audioContext || backgroundMusicPlaying) return;
+  backgroundMusicPlaying = true;
+  // Мелодия проигрывается по одной ноте на такт: этого достаточно, чтобы
+  // раунд ощущался живым, и не требует аудиофайла.
+  const melody = [262, 294, 330, 349, 392, 440, 494, 523];
+  let step = 0;
+  const tick = () => {
+    if (!backgroundMusicPlaying) return;
+    playSound(melody[step % melody.length], 0.22, 'sine', 0.08);
+    step++;
+    setTimeout(tick, 340);
+  };
+  tick();
 }
+function stopBackgroundMusic() { backgroundMusicPlaying = false; }
 
-function touchMoveHandler(e) {
-    if (gameState !== 'playing') return;
-
-    e.preventDefault(); // 防止页面滚动
-    const touch = e.touches[0];
-    const relativeX = getTouchPosition(touch);
-
-    if (relativeX > 0 && relativeX < canvas.width) {
-        paddleX = Math.max(0, Math.min(canvas.width - paddleWidth, relativeX - paddleWidth / 2));
-    }
-}
-
-function touchStartHandler(e) {
-    // 如果菜单打开，不处理触摸 — и не подавляем compatibility click по кнопкам
-    if (gameState === 'menu') return;
-
-    e.preventDefault(); // 防止页面滚动 (только во время gameplay)
-
-    const touch = e.touches[0];
-    const relativeX = getTouchPosition(touch);
-
-    if (relativeX > 0 && relativeX < canvas.width) {
-        paddleX = Math.max(0, Math.min(canvas.width - paddleWidth, relativeX - paddleWidth / 2));
-        vibrateDevice(10); // 轻微振动反馈
-    }
-}
-
-function collisionDetection() {
-    // 确保球的位置值是有效的
-    if (!isFinite(x) || !isFinite(y)) {
-        return;
-    }
-    
-    // 预计算球的边界
-    const ballLeft = x - ballRadius;
-    const ballRight = x + ballRadius;
-    const ballTop = y - ballRadius;
-    const ballBottom = y + ballRadius;
-    
-    // 只检测球可能碰撞的砖块区域
-    const startCol = Math.max(0, Math.floor((ballLeft - brickOffsetLeft) / (brickWidth + brickPadding)));
-    const endCol = Math.min(brickColumnCount - 1, Math.floor((ballRight - brickOffsetLeft) / (brickWidth + brickPadding)));
-    const startRow = Math.max(0, Math.floor((ballTop - brickOffsetTop) / (brickHeight + brickPadding)));
-    const endRow = Math.min(brickRowCount - 1, Math.floor((ballBottom - brickOffsetTop) / (brickHeight + brickPadding)));
-    
-    for (let c = startCol; c <= endCol; c++) {
-        for (let r = startRow; r <= endRow; r++) {
-            let b = bricks[c][r];
-            if (b.status == 1) {
-                if (x > b.x && x < b.x + brickWidth && y > b.y && y < b.y + brickHeight) {
-                    dy = -dy;
-                    b.status = 0;
-                    score++;
-                    hubScore(score);
-                    generateCollisionEffect(b.x + brickWidth / 2, b.y + brickHeight / 2);  // Generate brick hitting effects
-                    playBrickHitSound();  // 播放砖块击中音效
-                    vibrateDevice(15);  // 砖块碰撞振动反馈
-                    if (score == brickRowCount * brickColumnCount) {
-                        playVictorySound();  // 播放胜利音效
-                        saveHighScore(score);
-                        hubFinish(score);  // 保存高分
-                        gameState = 'menu';
-                        backgroundMusicPlaying = false;
-                        showMessage("🎉 Victory! 🎉", () => {
-                            resetGame();
-                            showMenu('startMenu');
-                        });
-                    }
-                    return; // 只处理第一个碰撞
-                }
-            }
-        }
-    }
-}
-
-
-function drawBall() {
-    // 确保位置值是有效的
-    if (!isFinite(x) || !isFinite(y) || x <= 0 || y <= 0) {
-        return;
-    }
-    
-    // 添加光晕效果
-    ctx.beginPath();
-    ctx.arc(x, y, ballRadius * 2, 0, Math.PI * 2);
-    
-    // 确保半径值是有效的
-    const radius = ballRadius * 2;
-    if (radius > 0) {
-        const glowGradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-        glowGradient.addColorStop(0, "rgba(255, 255, 255, 0.3)");
-        glowGradient.addColorStop(0.5, "rgba(0, 212, 255, 0.2)");
-        glowGradient.addColorStop(1, "rgba(0, 212, 255, 0)");
-        ctx.fillStyle = glowGradient;
-        ctx.fill();
-    }
-    ctx.closePath();
-    
-    // 绘制星星
-    if (starImage.complete) {
-    ctx.drawImage(starImage, x - ballRadius, y - ballRadius, ballRadius * 2, ballRadius * 2);
-    }
-}
-
-
-function drawPaddle() {
-    // 确保挡板位置值是有效的
-    if (!isFinite(paddleX)) {
-        return;
-    }
-    
-    const scaleFactor = 1.2;  // Scaling factor to slightly increase width and height
-    const scaledWidth = paddleWidth * scaleFactor;
-    const scaledHeight = paddleHeight * scaleFactor * 6;
-    const offsetX = (scaledWidth - paddleWidth) / 2;
-    const offsetY = (scaledHeight - paddleHeight) / 2;
-
-    // 添加底部光晕效果
-    ctx.beginPath();
-    ctx.ellipse(paddleX + paddleWidth/2, canvas.height - paddleHeight/2, 
-                scaledWidth/2, scaledHeight/4, 0, 0, Math.PI * 2);
-    const paddleGlow = ctx.createRadialGradient(
-        paddleX + paddleWidth/2, canvas.height - paddleHeight/2, 0,
-        paddleX + paddleWidth/2, canvas.height - paddleHeight/2, scaledWidth/2
-    );
-    paddleGlow.addColorStop(0, "rgba(0, 255, 100, 0.3)");
-    paddleGlow.addColorStop(1, "rgba(0, 255, 100, 0)");
-    ctx.fillStyle = paddleGlow;
-    ctx.fill();
-    ctx.closePath();
-
-    ctx.drawImage(paddleImage, paddleX - offsetX, canvas.height - paddleHeight - offsetY, scaledWidth, scaledHeight);
-}
-
-function drawBricks() {
-    const colors = [
-        ["#ff6b6b", "#ff5252"],
-        ["#4ecdc4", "#26a69a"],
-        ["#45b7d1", "#2196f3"],
-        ["#96ceb4", "#66bb6a"],
-        ["#feca57", "#ffb74d"]
-    ];
-    
-    for (let c = 0; c < brickColumnCount; c++) {
-        for (let r = 0; r < brickRowCount; r++) {
-            if (bricks[c][r].status == 1) {
-                let brickX = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
-                let brickY = (r * (brickHeight + brickPadding)) + brickOffsetTop;
-                bricks[c][r].x = brickX;
-                bricks[c][r].y = brickY;
-                
-                // 创建渐变效果
-                const gradient = ctx.createLinearGradient(brickX, brickY, brickX, brickY + brickHeight);
-                gradient.addColorStop(0, colors[r % colors.length][0]);
-                gradient.addColorStop(1, colors[r % colors.length][1]);
-                
-                // 绘制砖块主体
-                ctx.beginPath();
-                if (ctx.roundRect) {
-                    ctx.roundRect(brickX, brickY, brickWidth, brickHeight, 8);
-                } else {
-                ctx.rect(brickX, brickY, brickWidth, brickHeight);
-                }
-                ctx.fillStyle = gradient;
-                ctx.fill();
-                
-                // 添加发光边框
-                ctx.strokeStyle = colors[r % colors.length][0];
-                ctx.lineWidth = 2;
-                ctx.shadowColor = colors[r % colors.length][0];
-                ctx.shadowBlur = 5;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
-                
-                // 添加高光效果
-                const highlightGradient = ctx.createLinearGradient(brickX, brickY, brickX, brickY + brickHeight/3);
-                highlightGradient.addColorStop(0, "rgba(255, 255, 255, 0.3)");
-                highlightGradient.addColorStop(1, "rgba(255, 255, 255, 0)");
-                ctx.fillStyle = highlightGradient;
-                ctx.fill();
-                
-                ctx.closePath();
-            }
-        }
-    }
-}
-
-function drawScore() {
-    // 响应式字体大小
-    const fontSize = isVerySmallScreen() ? 14 : (isSmallScreen() ? 16 : 18);
-    ctx.font = `bold ${fontSize}px 'Orbitron', monospace`;
-    ctx.fillStyle = "#00d4ff";
-    ctx.shadowColor = "#00d4ff";
-    ctx.shadowBlur = 10;
-    ctx.fillText("SCORE: " + score, 15, 25);
-    ctx.shadowBlur = 0;
-}
-
-function drawLives() {
-    // 响应式字体大小
-    const fontSize = isVerySmallScreen() ? 14 : (isSmallScreen() ? 16 : 18);
-    ctx.font = `bold ${fontSize}px 'Orbitron', monospace`;
-    ctx.fillStyle = "#00d4ff";
-    ctx.shadowColor = "#00d4ff";
-    ctx.shadowBlur = 10;
-
-    // 根据屏幕大小调整位置
-    const textWidth = ctx.measureText("LIVES: " + lives).width;
-    ctx.fillText("LIVES: " + lives, canvas.width - textWidth - 15, 25);
-    ctx.shadowBlur = 0;
-}
-
-
-function drawTailParticles() {
-    // 限制粒子数量以提高性能（使用动态配置）
-    if (tailParticles.length > performanceConfig.maxParticles) {
-        tailParticles.splice(0, tailParticles.length - performanceConfig.maxParticles);
-    }
-    
-    for (let i = tailParticles.length - 1; i >= 0; i--) {
-        let particle = tailParticles[i];
-        
-        // 更新粒子位置和属性
-        particle.x += particle.dx;
-        particle.y += particle.dy;
-        particle.alpha *= 0.98;
-        particle.radius *= 0.98;
-        
-        // 移除过期的粒子
-        if (particle.alpha < 0.05 || particle.radius < 1) {
-            tailParticles.splice(i, 1);
-            continue;
-        }
-        
-        // 绘制粒子
-        ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
-        
-        // 使用预设颜色而不是每次创建渐变
-        if (particle.type === 'trail') {
-            ctx.fillStyle = `rgba(100, 150, 255, ${particle.alpha})`;
-        } else if (particle.type === 'explosion') {
-            ctx.fillStyle = `rgba(255, 100, 100, ${particle.alpha})`;
-        }
-        
-        ctx.fill();
-        ctx.closePath();
-    }
+// ── Частицы ────────────────────────────────────────────────────────────────
+function generateCollisionEffect(x, y) {
+  const count = performanceConfig.explosionParticleCount;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+    const speed = 1.5 + Math.random() * 2.5;
+    tailParticles.push({
+      x, y,
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      alpha: 0.9,
+      radius: 2 + Math.random() * 2.5,
+    });
+  }
 }
 
 function generateTailParticle(x, y) {
-    // 确保位置值是有效的
-    if (!isFinite(x) || !isFinite(y)) {
-        return;
-    }
-
-    // 根据性能配置控制粒子生成频率
-    if (Math.random() > performanceConfig.particleGenerationRate) {
-        return;
-    }
-
-    tailParticles.push({
-        x: x,
-        y: y,
-        dx: (Math.random() - 0.5) * 2,
-        dy: (Math.random() - 0.5) * 2,
-        radius: ballRadius / 3,
-        alpha: 1.0,
-        type: 'trail'
-    });
+  if (Math.random() > performanceConfig.particleGenerationRate) return;
+  tailParticles.push({
+    x: x + (Math.random() - 0.5) * 6,
+    y: y + (Math.random() - 0.5) * 6,
+    dx: (Math.random() - 0.5) * 0.4,
+    dy: 0.2 + Math.random() * 0.3,
+    alpha: 0.6,
+    radius: 1 + Math.random() * 1.5,
+  });
 }
 
-function generateCollisionEffect(x, y) {
-    // 确保位置值是有效的
-    if (!isFinite(x) || !isFinite(y)) {
-        return;
+// ── Отрисовка ──────────────────────────────────────────────────────────────
+function drawBricks() {
+  for (let c = 0; c < world.brickColumns; c++) {
+    for (let r = 0; r < world.brickRows; r++) {
+      const brick = world.bricks[c][r];
+      if (!brick.alive) continue;
+      const [light, dark] = BRICK_COLORS[r % BRICK_COLORS.length];
+      const gradient = ctx.createLinearGradient(brick.x, brick.y, brick.x, brick.y + world.brickHeight);
+      gradient.addColorStop(0, light);
+      gradient.addColorStop(1, dark);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(brick.x, brick.y, world.brickWidth, world.brickHeight, 8);
+      else ctx.rect(brick.x, brick.y, world.brickWidth, world.brickHeight);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.strokeStyle = light;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = light;
+      ctx.shadowBlur = 5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      const highlight = ctx.createLinearGradient(brick.x, brick.y, brick.x, brick.y + world.brickHeight / 3);
+      highlight.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+      highlight.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = highlight;
+      ctx.fill();
+      ctx.closePath();
     }
-
-    // 使用性能配置中的粒子数量
-    for (let i = 0; i < performanceConfig.explosionParticleCount; i++) {
-        tailParticles.push({
-            x: x,
-            y: y,
-            dx: (Math.random() - 0.5) * 6,
-            dy: (Math.random() - 0.5) * 6,
-            radius: ballRadius / 2 + Math.random() * 3,
-            alpha: 1.0,
-            type: 'explosion'
-        });
-    }
+  }
 }
 
-function draw() {
-    // 确保游戏状态有效
-    if (gameState !== 'playing') {
-        return;
-    }
-    
-    // 确保关键变量已初始化
-    if (!isFinite(x) || !isFinite(y) || !isFinite(dx) || !isFinite(dy)) {
-        console.error('Game variables not properly initialized');
-        return;
-    }
-    
-    // 清除画布
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // 设置默认绘制状态
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 1;
-    
-    // 按层次绘制
-    drawBricks();
-    drawTailParticles();
-    drawBall();
-    drawPaddle();
-    drawScore();
-    drawLives();
-    collisionDetection();
-
-    if (x + dx > canvas.width - ballRadius || x + dx < ballRadius) {
-        dx = -dx;
-    }
-    if (y + dy < ballRadius) {
-        dy = -dy;
-    } else if (y + dy > canvas.height - ballRadius) {
-        if (x > paddleX && x < paddleX + paddleWidth) {
-            dy = -dy;
-            generateCollisionEffect(x, canvas.height - paddleHeight);  // 生成碰撞反弹板效果
-            playPaddleHitSound();  // 播放挡板击中音效
-            vibrateDevice(20);  // 挡板碰撞振动反馈
-        } else {
-            lives--;
-            if (lives > 0) {
-                showMessage("💔 Life Lost!", () => {
-                    x = canvas.width / 2;
-                    y = canvas.height - 30;
-                    dx = 4;
-                    dy = -4;
-                    draw();
-                });
-            } else {
-                playGameOverSound();  // 播放游戏结束音效
-                saveHighScore(score);
-                hubFinish(score);  // 保存高分
-                gameState = 'menu';
-                backgroundMusicPlaying = false;
-                showMessage("💀 Game Over!", () => {
-                    resetGame();
-                    showMenu('startMenu');
-                });
-            }
-            return; // Stops the current drawing loop and waits for user input.
-        }
-    }
-
-    x += dx;
-    y += dy;
-    generateTailParticle(x, y);  // Generate meteor tail particles
-    
-    if (gameState === 'playing') {
-        animationId = requestAnimationFrame(draw);
-    }
+function drawPaddle() {
+  if (!Number.isFinite(world.paddleX)) return;
+  const scaleFactor = 1.2;
+  const scaledWidth = world.paddleWidth * scaleFactor;
+  const scaledHeight = world.paddleHeight * scaleFactor * 6;
+  const offsetX = (scaledWidth - world.paddleWidth) / 2;
+  const offsetY = (scaledHeight - world.paddleHeight) / 2;
+  const cx = world.paddleX + world.paddleWidth / 2;
+  const cy = canvas.height - world.paddleHeight / 2;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, scaledWidth / 2, scaledHeight / 4, 0, 0, Math.PI * 2);
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, scaledWidth / 2);
+  glow.addColorStop(0, 'rgba(0, 255, 100, 0.3)');
+  glow.addColorStop(1, 'rgba(0, 255, 100, 0)');
+  ctx.fillStyle = glow;
+  ctx.fill();
+  ctx.closePath();
+  ctx.drawImage(paddleImage, world.paddleX - offsetX, canvas.height - world.paddleHeight - offsetY, scaledWidth, scaledHeight);
 }
 
-function showMessage(message, callback) {
-    const messageBox = document.getElementById("messageBox");
-    const messageText = document.getElementById("messageText");
-    const messageButton = document.getElementById("messageButton");
-
-    messageText.textContent = message;
-    messageBox.classList.remove("hidden");
-
-    messageButton.onclick = () => {
-        messageBox.classList.add("hidden");
-        callback();
-    };
+function drawBall() {
+  if (!Number.isFinite(world.x) || !Number.isFinite(world.y)) return;
+  if (world.x <= 0 || world.y <= 0) return;
+  const radius = world.ballRadius * 2;
+  ctx.beginPath();
+  ctx.arc(world.x, world.y, radius, 0, Math.PI * 2);
+  if (radius > 0) {
+    const glow = ctx.createRadialGradient(world.x, world.y, 0, world.x, world.y, radius);
+    glow.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+    glow.addColorStop(0.5, 'rgba(0, 212, 255, 0.2)');
+    glow.addColorStop(1, 'rgba(0, 212, 255, 0)');
+    ctx.fillStyle = glow;
+    ctx.fill();
+  }
+  ctx.closePath();
+  if (starImage.complete) ctx.drawImage(starImage, world.x - world.ballRadius, world.y - world.ballRadius, radius, radius);
 }
 
-function resetGame() {
-    __hubDone = false;
-    lives = 3;
-    score = 0;
-    for (let c = 0; c < brickColumnCount; c++) {
-        for (let r = 0; r < brickRowCount; r++) {
-            bricks[c][r].status = 1;
-        }
+function drawTailParticles() {
+  if (tailParticles.length > performanceConfig.maxParticles) {
+    tailParticles.splice(0, tailParticles.length - performanceConfig.maxParticles);
+  }
+  for (let i = tailParticles.length - 1; i >= 0; i--) {
+    const p = tailParticles[i];
+    p.x += p.dx;
+    p.y += p.dy;
+    p.alpha *= 0.98;
+    p.radius *= 0.98;
+    if (p.alpha < 0.05 || p.radius < 1) { tailParticles.splice(i, 1); continue; }
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0, 212, 255, ${p.alpha})`;
+    ctx.fill();
+  }
+}
+
+function drawScore() {
+  const fontSize = isVerySmallScreen() ? 14 : (isSmallScreen() ? 16 : 18);
+  ctx.font = `bold ${fontSize}px monospace`;
+  ctx.fillStyle = '#00d4ff';
+  ctx.shadowColor = '#00d4ff';
+  ctx.shadowBlur = 10;
+  ctx.fillText('ОЧКИ: ' + world.score, 15, 25);
+  ctx.shadowBlur = 0;
+  const text = 'ЖИЗНИ: ' + world.lives;
+  const textWidth = ctx.measureText(text).width;
+  ctx.fillText(text, canvas.width - textWidth - 15, 25);
+  ctx.shadowBlur = 0;
+}
+
+function render() {
+  if (!world) return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 1;
+  drawBricks();
+  drawTailParticles();
+  drawBall();
+  drawPaddle();
+  drawScore();
+}
+
+// ── Игровой цикл ───────────────────────────────────────────────────────────
+/**
+ * Один кадр: физика получает реальное время и сама решает, сколько шагов
+ * выполнить. Раньше здесь стояло `x += 4` на кадр, то есть скорость мяча
+ * была пропорциональна частоте кадров.
+ */
+function update(dtSeconds) {
+  physics.stepFrame(world, dtSeconds);
+  generateTailParticle(world.x, world.y);
+  for (const event of physics.drainEvents(world)) {
+    switch (event.type) {
+      case 'brick':
+        generateCollisionEffect(event.x, event.y);
+        playBrickHitSound();
+        vibrateDevice(15);
+        hubScore(world.score);
+        break;
+      case 'paddle':
+        generateCollisionEffect(event.x, canvas.height - world.paddleHeight);
+        playPaddleHitSound();
+        vibrateDevice(20);
+        break;
+      case 'wall':
+        break;
+      case 'cleared':
+        playVictorySound();
+        saveHighScore(world.score);
+        hubFinish(world.score);
+        gameState = 'menu';
+        stopBackgroundMusic();
+        showMessage('Победа!', () => { restartGame(); showMenu('startMenu'); });
+        break;
+      case 'lifeLost':
+        showMessage(`Потеряна жизнь. Осталось: ${event.lives}`, () => { physics.serveBall(world, 0); lastFrameTime = 0; });
+        break;
+      case 'gameOver':
+        playGameOverSound();
+        saveHighScore(world.score);
+        hubFinish(world.score);
+        gameState = 'menu';
+        stopBackgroundMusic();
+        showMessage('Игра окончена', () => { restartGame(); showMenu('startMenu'); });
+        break;
+      default:
+        break;
     }
-    initGame();
+  }
 }
 
-
-
-function initGame() {
-    x = canvas.width / 2;
-    y = canvas.height - 30;
-    dx = 4;
-    dy = -4;
-    gameState = 'playing';
-    playBackgroundMusic();  // 开始播放背景音乐
-    draw();
+function frame(now) {
+  if (gameState !== 'playing') return;
+  if (!lastFrameTime) lastFrameTime = now;
+  const dt = (now - lastFrameTime) / 1000;
+  lastFrameTime = now;
+  update(dt);
+  render();
+  if (gameState === 'playing') animationId = requestAnimationFrame(frame);
 }
 
-// 菜单管理
-let gameState = 'menu'; // 'menu', 'playing', 'paused'
-let animationId;
+function startLoop() {
+  if (animationId) cancelAnimationFrame(animationId);
+  lastFrameTime = 0;
+  animationId = requestAnimationFrame(frame);
+}
 
-// 高分榜系统
-let highScores = JSON.parse(localStorage.getItem('starlightBreakerHighScores')) || [];
+function stopLoop() {
+  if (animationId) cancelAnimationFrame(animationId);
+  animationId = null;
+  lastFrameTime = 0;
+}
+
+// ── Управление платформой ──────────────────────────────────────────────────
+function clampPaddle() {
+  world.paddleX = Math.max(0, Math.min(canvas.width - world.paddleWidth, world.paddleX));
+}
+
+function getTouchPosition(touch) {
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return 0;
+  const scaleX = canvas.width / rect.width;
+  return (touch.clientX - rect.left) * scaleX - world.paddleWidth / 2;
+}
+
+function mouseMoveHandler(e) {
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return;
+  world.paddleX = (e.clientX - rect.left) * (canvas.width / rect.width) - world.paddleWidth / 2;
+  clampPaddle();
+}
+
+// Слушатель висит на canvas, а не на document: глобальный touchstart
+// перехватывал свайп по меню хаба, и карточка под платформой не отвечала.
+function touchMoveHandler(e) {
+  const touch = e.touches[0];
+  if (!touch) return;
+  e.preventDefault();
+  world.paddleX = getTouchPosition(touch);
+  clampPaddle();
+}
+
+function touchStartHandler(e) {
+  const touch = e.touches[0];
+  if (!touch) return;
+  world.paddleX = getTouchPosition(touch);
+  clampPaddle();
+}
+
+// ── Рекорды ────────────────────────────────────────────────────────────────
+let highScores = [];
+try {
+  highScores = JSON.parse(localStorage.getItem('starlightBreakerHighScores')) || [];
+} catch { highScores = []; }
 
 function saveHighScore(score) {
-    highScores.push(score);
-    highScores.sort((a, b) => b - a);
-    highScores = highScores.slice(0, 10); // 只保留前10个高分
-    localStorage.setItem('starlightBreakerHighScores', JSON.stringify(highScores));
+  highScores.push(score);
+  highScores.sort((a, b) => b - a);
+  highScores = highScores.slice(0, 10);
+  try { localStorage.setItem('starlightBreakerHighScores', JSON.stringify(highScores)); } catch { /* private mode */ }
 }
 
 function displayHighScores() {
-    const highScoreList = document.getElementById('highScoreList');
-    if (highScores.length === 0) {
-        highScoreList.innerHTML = '<div class="score-item"><span>No high scores yet!</span></div>';
-        return;
-    }
-    
-    highScoreList.innerHTML = highScores.map((score, index) => `
-        <div class="score-item">
-            <span class="score-rank">#${index + 1}</span>
-            <span class="score-value">${score}</span>
-        </div>
-    `).join('');
+  const list = document.getElementById('highScoreList');
+  if (!list) return;
+  if (!highScores.length) {
+    list.innerHTML = '<div class="score-item"><span>Пока пусто</span></div>';
+    return;
+  }
+  list.innerHTML = highScores.map((score, index) => `
+    <div class="score-item">
+      <span class="score-rank">#${index + 1}</span>
+      <span class="score-value">${score}</span>
+    </div>`).join('');
+}
+
+// ── Меню и состояния ───────────────────────────────────────────────────────
+function showMessage(message, callback) {
+  const box = document.getElementById('messageBox');
+  const text = document.getElementById('messageText');
+  const button = document.getElementById('messageButton');
+  if (!box || !text || !button) return;
+  text.textContent = message;
+  box.classList.remove('hidden');
+  button.onclick = () => { box.classList.add('hidden'); if (callback) callback(); };
 }
 
 function showMenu(menuId) {
-    console.log('Showing menu:', menuId);
-    
-    // 隐藏所有菜单
-    document.querySelectorAll('.menu').forEach(menu => {
-        menu.classList.remove('active');
-        menu.classList.add('hidden');
-        console.log('Hidden menu:', menu.id);
-    });
-    
-    // 显示指定菜单
-    const targetMenu = document.getElementById(menuId);
-    if (targetMenu) {
-        targetMenu.classList.remove('hidden');
-        targetMenu.classList.add('active');
-        console.log('Showed menu:', menuId, 'with active class');
-    } else {
-        console.error('Menu not found:', menuId);
-    }
-    
-    // 隐藏游戏UI
-    const gameMenu = document.getElementById('gameMenu');
-    if (gameMenu) {
-        gameMenu.classList.remove('active');
-        gameMenu.classList.add('hidden');
-    }
+  document.querySelectorAll('.menu').forEach((menu) => {
+    menu.classList.remove('active');
+    menu.classList.add('hidden');
+  });
+  const target = document.getElementById(menuId);
+  if (target) {
+    target.classList.remove('hidden');
+    target.classList.add('active');
+  }
+  const gameMenu = document.getElementById('gameMenu');
+  if (gameMenu) {
+    gameMenu.classList.remove('active');
+    gameMenu.classList.add('hidden');
+  }
 }
 
 function hideAllMenus() {
-    console.log('Hiding all menus and showing game UI');
-    
-    document.querySelectorAll('.menu').forEach(menu => {
-        menu.classList.remove('active');
-        menu.classList.add('hidden');
-    });
-    
-    // 显示游戏UI
-    const gameMenu = document.getElementById('gameMenu');
-    if (gameMenu) {
-        gameMenu.classList.remove('hidden');
-        gameMenu.classList.add('active');
-        console.log('Game UI is now active');
-    }
+  document.querySelectorAll('.menu').forEach((menu) => {
+    menu.classList.remove('active');
+    menu.classList.add('hidden');
+  });
+  const gameMenu = document.getElementById('gameMenu');
+  if (gameMenu) {
+    gameMenu.classList.remove('hidden');
+    gameMenu.classList.add('active');
+  }
 }
 
-function pauseGame() {
-    gameState = 'paused';
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-    }
-    showMenu('pauseMenu');
-}
-
-function resumeGame() {
-    gameState = 'playing';
-    hideAllMenus();
-    draw();
+function startGame() {
+  __hubDone = false;
+  physics.resetWorld(world);
+  physics.serveBall(world, 0);
+  gameState = 'playing';
+  playBackgroundMusic();
+  hideAllMenus();
+  startLoop();
 }
 
 function restartGame() {
-    gameState = 'playing';
-    hideAllMenus();
-    resetGame();
+  if (!world) buildWorld();
+  startGame();
+}
+
+function pauseGame() {
+  gameState = 'paused';
+  stopLoop();
+  showMenu('pauseMenu');
+}
+
+function resumeGame() {
+  if (!world) buildWorld();
+  gameState = 'playing';
+  hideAllMenus();
+  startLoop();
 }
 
 function backToMainMenu() {
-    gameState = 'menu';
-    backgroundMusicPlaying = false;
-    if (animationId) {
-        cancelAnimationFrame(animationId);
-    }
-    showMenu('startMenu');
+  gameState = 'menu';
+  stopBackgroundMusic();
+  stopLoop();
+  showMenu('startMenu');
 }
 
-// 事件监听器
-document.addEventListener("DOMContentLoaded", () => {
-    console.log('DOM Content Loaded - Initializing game...');
+function checkOrientation() {
+  const warning = document.getElementById('orientationWarning');
+  if (!warning) return;
+  // Подсказка о повороте: игра вертикальная, но в WebView мессенджера
+  // принудительный поворот ломает вёрстку хаба, поэтому подсказываем, а не
+  // блокируем.
+  const tooNarrow = window.innerHeight < 320 || window.innerWidth < 300;
+  warning.classList.toggle('hidden', !tooNarrow);
+}
 
-    // 初始化 Canvas 尺寸（必须在 DOM 加载后）
-    resizeCanvas();
+function showTouchGuide() {
+  const guide = document.getElementById('touchGuide');
+  if (!guide) return;
+  // Ключ и значение — как в исходной версии. Смена ключа показала бы гайд
+  // заново всем, кто его уже видел.
+  let seen = false;
+  try { seen = localStorage.getItem('hasSeenTouchGuide') === 'true'; } catch { seen = true; }
+  if (seen || !isMobile) return;
+  guide.classList.remove('hidden');
+  document.getElementById('touchGuideBtn').onclick = () => {
+    guide.classList.add('hidden');
+    try { localStorage.setItem('hasSeenTouchGuide', 'true'); } catch { /* private mode */ }
+  };
+}
 
-    // 初始化方向检测
-    checkOrientation();
+// ── Инициализация ──────────────────────────────────────────────────────────
+function init() {
+  if (!canvas) return;
+  buildWorld();
+  // showMenu сам прячет gameMenu, поэтому дублировать инициализацию через
+  // window.load и вызывать hideAllMenus здесь не нужно.
+  showMenu('startMenu');
+  checkOrientation();
+  showTouchGuide();
 
-    // 确保初始状态正确
-    gameState = 'menu';
+  canvas.addEventListener('touchstart', touchStartHandler, { passive: true });
+  canvas.addEventListener('touchmove', touchMoveHandler, { passive: false });
+  canvas.addEventListener('mousemove', mouseMoveHandler);
+  document.addEventListener('mousemove', mouseMoveHandler);
 
-    // 确保开始菜单显示
+  const on = (id, handler) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', handler);
+  };
+  on('startGameBtn', startGame);
+  on('instructionsBtn', () => showMenu('instructionsMenu'));
+  on('highScoreBtn', () => { displayHighScores(); showMenu('highScoreMenu'); });
+  on('backToMenuBtn', () => showMenu('startMenu'));
+  on('backToMenuFromScoresBtn', () => showMenu('startMenu'));
+  on('clearScoresBtn', () => { highScores = []; try { localStorage.removeItem('starlightBreakerHighScores'); } catch { /* ignore */ } displayHighScores(); });
+  on('pauseBtn', pauseGame);
+  on('menuBtn', backToMainMenu);
+  on('resumeBtn', resumeGame);
+  on('restartBtn', restartGame);
+  on('backToMainMenuBtn', backToMainMenu);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && gameState === 'playing') pauseGame();
+  });
+
+  // Поворот экрана меняет доступную высоту, а значит и размер холста.
+  // Ориентир приходит не всегда раньше rotate, поэтому пересчёт отложен.
+  window.addEventListener('orientationchange', () => {
     setTimeout(() => {
-        console.log('Setting up initial menu state...');
-        showMenu('startMenu');
+      resizeCanvas();
+      checkOrientation();
     }, 100);
-    
-    // 开始菜单按钮
-    const startGameBtn = document.getElementById('startGameBtn');
-    if (startGameBtn) {
-        startGameBtn.addEventListener('click', () => {
-            console.log('Start game button clicked');
-            gameState = 'playing';
-            hideAllMenus();
-            showTouchGuide();  // 显示触摸指引（仅首次）
-            initGame();
-        });
-    } else {
-        console.error('Start game button not found!');
-    }
-    
-    // 其他菜单按钮
-    const instructionsBtn = document.getElementById('instructionsBtn');
-    if (instructionsBtn) {
-        instructionsBtn.addEventListener('click', () => {
-            console.log('Instructions button clicked');
-            showMenu('instructionsMenu');
-        });
-    }
-    
-    const highScoreBtn = document.getElementById('highScoreBtn');
-    if (highScoreBtn) {
-        highScoreBtn.addEventListener('click', () => {
-            console.log('High score button clicked');
-            displayHighScores();
-            showMenu('highScoreMenu');
-        });
-    }
-    
-    // 说明页面按钮
-    const backToMenuBtn = document.getElementById('backToMenuBtn');
-    if (backToMenuBtn) {
-        backToMenuBtn.addEventListener('click', () => {
-            console.log('Back to menu button clicked');
-            showMenu('startMenu');
-        });
-    }
-    
-    // 高分榜按钮
-    const clearScoresBtn = document.getElementById('clearScoresBtn');
-    if (clearScoresBtn) {
-        let clearArmed = false;
-        let clearTimer = null;
-        clearScoresBtn.addEventListener('click', () => {
-            // window.confirm в хабе подменён на false, поэтому подтверждение — повторным тапом
-            if (!clearArmed) {
-                clearArmed = true;
-                const label = clearScoresBtn.textContent;
-                clearScoresBtn.textContent = 'Точно очистить?';
-                clearTimer = setTimeout(() => {
-                    clearArmed = false;
-                    clearScoresBtn.textContent = label;
-                }, 3000);
-                return;
-            }
-            clearTimeout(clearTimer);
-            clearArmed = false;
-            highScores = [];
-            localStorage.removeItem('starlightBreakerHighScores');
-            displayHighScores();
-        });
-    }
-    
-    const backToMenuFromScoresBtn = document.getElementById('backToMenuFromScoresBtn');
-    if (backToMenuFromScoresBtn) {
-        backToMenuFromScoresBtn.addEventListener('click', () => {
-            showMenu('startMenu');
-        });
-    }
-    
-    // 游戏UI按钮
-    const pauseBtn = document.getElementById('pauseBtn');
-    if (pauseBtn) {
-        pauseBtn.addEventListener('click', pauseGame);
-    }
-    
-    const menuBtn = document.getElementById('menuBtn');
-    if (menuBtn) {
-        menuBtn.addEventListener('click', backToMainMenu);
-    }
-    
-    // 暂停菜单按钮
-    const resumeBtn = document.getElementById('resumeBtn');
-    if (resumeBtn) {
-        resumeBtn.addEventListener('click', resumeGame);
-    }
-    
-    const restartBtn = document.getElementById('restartBtn');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', restartGame);
-    }
-    
-    const backToMainMenuBtn = document.getElementById('backToMainMenuBtn');
-    if (backToMainMenuBtn) {
-        backToMainMenuBtn.addEventListener('click', backToMainMenu);
-    }
-    
-    // 键盘事件
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && gameState === 'playing') {
-            pauseGame();
-        } else if (e.key === 'Escape' && gameState === 'paused') {
-            resumeGame();
-        }
-    });
-    
-    console.log('All event listeners set up successfully');
-});
+  });
 
-// 全局调试函数 - 可以在控制台中调用
-window.forceShowStartMenu = function() {
-    console.log('Force showing start menu...');
-    
-    // 隐藏所有菜单
-    document.querySelectorAll('.menu').forEach(menu => {
-        menu.classList.remove('active');
-        menu.classList.add('hidden');
-    });
-    
-    // 显示开始菜单
-    const startMenu = document.getElementById('startMenu');
-    if (startMenu) {
-        startMenu.classList.remove('hidden');
-        startMenu.classList.add('active');
-        console.log('Start menu is now visible with active class');
-    }
-    
-    // 隐藏游戏UI
-    const gameMenu = document.getElementById('gameMenu');
-    if (gameMenu) {
-        gameMenu.classList.remove('active');
-        gameMenu.classList.add('hidden');
-    }
-    
-    // 重置游戏状态
-    gameState = 'menu';
-    console.log('Game state reset to menu');
-};
-
-// 备用初始化 - 如果DOMContentLoaded没有触发
-window.addEventListener('load', () => {
-    console.log('Window load event - backup initialization');
-
-    // 初始化 Canvas 尺寸（备用）
-    if (canvas && canvas.width === 0) {
-        resizeCanvas();
-    }
-
-    // 确保开始菜单显示
-    const startMenu = document.getElementById('startMenu');
-    if (startMenu) {
-        startMenu.classList.remove('hidden');
-        startMenu.classList.add('active');
-        console.log('Backup: Start menu set to active');
-    }
-
-    // 确保其他菜单隐藏
-    const otherMenus = ['pauseMenu', 'instructionsMenu', 'highScoreMenu', 'gameMenu'];
-    otherMenus.forEach(menuId => {
-        const menu = document.getElementById(menuId);
-        if (menu) {
-            menu.classList.remove('active');
-            menu.classList.add('hidden');
-            console.log('Backup: Hidden menu', menuId);
-        }
-    });
-});
-
-// 窗口大小改变时重新调整 Canvas
-let resizeTimeout;
-window.addEventListener('resize', () => {
-    // 使用防抖避免频繁调整
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-        resizeCanvas();
-        // 如果游戏暂停，重新绘制一次
-        if (gameState === 'paused' || gameState === 'menu') {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-        }
+      resizeCanvas();
+      checkOrientation();
+      if (gameState === 'menu' || gameState === 'paused') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     }, 250);
-});
+  });
+
+  // Вкладка ушла в фон: цикл надо остановить, иначе по возвращении придёт
+  // огромный dt. stepFrame это переживает, но звук и фоновая музыка — нет.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && gameState === 'playing') pauseGame();
+  });
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+})();
