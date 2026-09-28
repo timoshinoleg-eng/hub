@@ -53,6 +53,37 @@ assert.match(router, /globalThis\.window\?\.HUB_ASSET_REVISION/, 'launch-router 
 // Ревизия обязана приходить из runtime-config, а не быть зашитой в модуль.
 assert.match(router, /HUB_ASSET_REVISION/, 'launch-router derives the revision from runtime config');
 
+// Фолбэк-ревизии обязаны совпадать между собой.
+//
+// runtime-config.js отдаётся no-store, поэтому при пропаже связи он не
+// загрузится вообще, и каждый модуль возьмёт свой фолбэк. Раньше они
+// расходились: index.html и bootstrap.js брали одну дату, main.js другую.
+// В итоге граф грузился под двумя ревизиями одновременно — ровно та смесь
+// старого и нового, ради которой написан весь этот контракт. Значение 'dev'
+// выбрано вместо даты специально: оно не выглядит как релиз, поэтому его
+// нельзя случайно выдать за боевую сборку, и правка ревизии больше не
+// требует править четыре файла.
+const fallbacks = new Map();
+for (const [file, src] of [
+  ['index.html', readFileSync(join(root, 'index.html'), 'utf8')],
+  ['js/bootstrap.js', readFileSync(join(root, 'js', 'bootstrap.js'), 'utf8')],
+  ['js/launch-router.js', router],
+  ['js/main.js', main],
+]) {
+  const m = src.match(/HUB_ASSET_REVISION\s*\|\|\s*'([^']+)'/);
+  assert.ok(m, `${file}: фолбэк-ревизия должна быть строковым литералом, а не undefined`);
+  fallbacks.set(file, m[1]);
+}
+const distinct = new Set(fallbacks.values());
+assert.equal(distinct.size, 1, `фолбэк-ревизии в модулях шелла разошлись: ${[...fallbacks].map(([f, v]) => `${f}=${v}`).join(', ')}`);
+
+// Ревизия из runtime-config обязана отличаться от фолбэка: иначе оффлайн-сбой
+// и обычный запуск выглядели бы одинаково, и по логам нельзя было бы понять,
+// что конфиг не пришёл.
+const shipped = runtimeConfig.match(/HUB_ASSET_REVISION\s*=\s*'([^']+)'/)?.[1];
+assert.ok(shipped, 'runtime-config.js объявляет HUB_ASSET_REVISION');
+assert.notEqual(shipped, [...distinct][0], 'боевая ревизия runtime-config не должна совпадать с фолбэком');
+
 console.log('MAX cached-shell recovery contract: ok');
 console.log('  every executable module in the shell graph is loaded with a release-scoped URL');
 console.log('  including launch-router.js, which is evaluated before main.js');
