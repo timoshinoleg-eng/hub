@@ -29,6 +29,17 @@ for (const id of readdirSync(GAMES)) {
   } else if (!html.includes('_boot.js')) err(`${id}: не встроен _boot.js`);
   if (!/<meta[^>]+viewport/i.test(html)) warn(`${id}: нет viewport meta`);
 
+  // games/_rng.js подменяет Math.random для «пазла дня», поэтому он обязан
+  // грузиться раньше скрипта игры. Порядок здесь и есть весь механизм: подключим
+  // после — и шим выполнится слишком поздно, а игра останется случайной при
+  // заявленном в манифесте daily, и это не поймает ни один тест.
+  if (!manifest?.modulePath) {
+    const rng = html.indexOf('src="../_rng.js"');
+    const own = html.search(/<script src="(script\.js|game\.js|physics\.js)/);
+    if (rng < 0) err(`${id}: не подключён ../_rng.js — игра останется недетерминированной`);
+    else if (own >= 0 && rng > own) err(`${id}: ../_rng.js подключён после скрипта игры — seed не сработает`);
+  }
+
   const refs = [...html.matchAll(/(?:src|href)\s*=\s*"([^"]+)"/g)].map((m) => m[1]).filter(Boolean);
   for (const ref of refs) {
     if (/^https?:\/\//i.test(ref)) { err(`${id}: внешний runtime-ресурс запрещён ${ref}`); continue; }

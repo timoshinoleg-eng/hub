@@ -1,8 +1,7 @@
 let board=[];let rows=8;let columns=8;let minesCount=10;let minesLocation=[];let tilesClicked=0;let flagEnabled=false;let gameOver=false;let __hubDone=false;
 function hubScore(s){window.parent.postMessage({__hub:1,type:'score',value:s},'*')}function hubFinish(s){if(__hubDone)return;__hubDone=true;window.parent.postMessage({__hub:1,type:'finish',score:s},'*')}
-const __hubParams=new URLSearchParams(location.search);const __hubSeed=__hubParams.get('seed');function __hubHash(s){let h=1779033703^s.length;for(let i=0;i<s.length;i++){h=Math.imul(h^s.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19)}return h>>>0}let __hubSeedState=__hubSeed?__hubHash(__hubSeed):0;function __hubRand(){if(!__hubSeed)return Math.random();let t=(__hubSeedState+=0x6D2B79F5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296}
 window.onload=()=>startGame();
-function setMines(){let left=minesCount;while(left>0){const r=Math.floor(__hubRand()*rows),c=Math.floor(__hubRand()*columns),id=`${r}-${c}`;if(!minesLocation.includes(id)){minesLocation.push(id);left--}}}
+function setMines(){let left=minesCount;while(left>0){const r=Math.floor(Math.random()*rows),c=Math.floor(Math.random()*columns),id=`${r}-${c}`;if(!minesLocation.includes(id)){minesLocation.push(id);left--}}}
 function updateOpened(){const el=document.getElementById('opened-count');if(el)el.textContent=String(tilesClicked)}
 function setFlag(){flagEnabled=!flagEnabled;const b=document.getElementById('flag-button');b.classList.toggle('active',flagEnabled);b.setAttribute('aria-pressed',String(flagEnabled))}
 function startGame(){

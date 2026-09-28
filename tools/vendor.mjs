@@ -58,25 +58,13 @@ document.addEventListener("touchend", (e) => {
 /**
  * Патчи. Каждый — точная строковая замена. Если замена не находится,
  * скрипт падает с явной ошибкой — молча не проходит ни одна правка.
+ *
+ * Детерминированный «пазл дня» сюда больше не входит: он живёт в
+ * games/_rng.js, который подключается строкой в index.html до скрипта игры
+ * и подменяет Math.random на всех играх сразу. Прежде он встраивался сюда
+ * текстом и правил два вызова в sapper и quiz, из-за чего echo и memory,
+ * помеченные в манифесте как daily, seed игнорировали.
  */
-/**
- * Детерминированный «пазл дня»: если в URL игры есть ?seed=YYYY-MM-DD,
- * раскладка/порядок одинаковы у всех за этот день. Блок встраивается в
- * script.js и даёт __hubRand() — обычный Math.random(), если seed не задан.
- */
-const DAILY_SEED = `
-// «Пазл дня»: при ?seed=YYYY-MM-DD раскладка детерминирована для всех за этот день.
-const __hubParams = new URLSearchParams(location.search);
-const __hubSeed = __hubParams.get("seed");
-function __hubHash(s) { let h = 1779033703 ^ s.length; for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); } return (h >>> 0); }
-let __hubSeedState = __hubSeed ? __hubHash(__hubSeed) : 0;
-function __hubRand() {
-  if (!__hubSeed) return Math.random();
-  let t = (__hubSeedState += 0x6D2B79F5);
-  t = Math.imul(t ^ (t >>> 15), t | 1);
-  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-}`;
 
 // Общие правки второй волны: у всех игр пакета одинаковая шапка
 // (внешний favicon + Google Fonts — запрещены check.mjs).
@@ -286,22 +274,6 @@ function flagTile(tile) {
   align-items: center;
 }`,
     },
-    // «Пазл дня»: детерминированная раскладка мин при ?seed.
-    {
-      file: 'script.js',
-      from: 'window.onload = function () {',
-      to: `${DAILY_SEED}\n\nwindow.onload = function () {`,
-    },
-    {
-      file: 'script.js',
-      from: 'let r = Math.floor(Math.random() * rows);',
-      to: 'let r = Math.floor(__hubRand() * rows);',
-    },
-    {
-      file: 'script.js',
-      from: 'let c = Math.floor(Math.random() * columns);',
-      to: 'let c = Math.floor(__hubRand() * columns);',
-    },
   ],
 
   // ── Викторина (Quiz) ───────────────────────────────────────────────────
@@ -356,22 +328,6 @@ function flagTile(tile) {
     { file: 'index.html', from: '    <h1 style="margin-bottom: 2px;">Quiz App</h1>', to: '    <h1 style="margin-bottom: 2px;">Викторина</h1>' },
     { file: 'index.html', from: '      <h4 style="margin-top: 0px;">20 Questions</h4>', to: '      <h4 style="margin-top: 0px;">20 вопросов</h4>' },
     { file: 'index.html', re: /\s*<link rel="icon"[^>]*>/g, to: '' },
-    // «Пазл дня»: детерминированный порядок вопросов и вариантов при ?seed.
-    {
-      file: 'script.js',
-      from: 'function shuffleArray(array) {',
-      to: `${DAILY_SEED}\n\nfunction shuffleArray(array) {`,
-    },
-    {
-      file: 'script.js',
-      from: 'const j = Math.floor(Math.random() * (i + 1));',
-      to: 'const j = Math.floor(__hubRand() * (i + 1));',
-    },
-    {
-      file: 'script.js',
-      from: 'quizData.sort(() => Math.random() - 0.5);',
-      to: 'quizData.sort(() => __hubRand() - 0.5);',
-    },
   ],
 
   // ── Эхо (Simon Says) ────────────────────────────────────────────────────
