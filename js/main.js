@@ -1,4 +1,4 @@
-const revision = window.HUB_ASSET_REVISION || '20260916-games12';
+const revision = window.HUB_ASSET_REVISION || 'dev';
 const v = encodeURIComponent(revision);
 
 const { bridge } = await import(`./bridge.js?v=${v}`);

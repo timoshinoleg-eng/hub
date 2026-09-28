@@ -12,7 +12,7 @@
 //
 // Ревизия читается через globalThis, а не через window: модуль импортируется
 // и из Node в tools/quizzzz-integration.mjs, где window не существует.
-const REVISION = encodeURIComponent(globalThis.window?.HUB_ASSET_REVISION || '');
+const REVISION = encodeURIComponent(globalThis.window?.HUB_ASSET_REVISION || 'dev');
 const { isQuizzzzStartParam, quizzzzLaunchUrl } = await import(`./quizzzz-routing.js?v=${REVISION}`);
 const { bridge } = await import(`./bridge.js?v=${REVISION}`);
 
