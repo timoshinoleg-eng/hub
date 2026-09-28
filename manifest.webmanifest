@@ -1,0 +1,29 @@
+{
+  "name": "Игротека — мини-аркада",
+  "short_name": "Игротека",
+  "description": "12 мини-игр прямо в чате: аркады, головоломки и стратегии на пару минут.",
+  "lang": "ru",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090b14",
+  "theme_color": "#090b14",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-maskable.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ]
+}

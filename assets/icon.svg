@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Игротека">
+  <!--
+    Самостоятельный документ, а не <symbol> из assets/icons.svg: манифест
+    просит отдельный файл, а спрайт пришлось бы вырезать в рантайме.
+
+    Цвета совпадают с --bg и бренд-градиентом из css/hub.css, чтобы иконка на
+    рабочем столе совпадала с первой картинкой приложения.
+
+    Формат — SVG, а не PNG сознательно: растровых ассетов в репозитории нет, а
+    Chrome принимает SVG-иконки манифеста с sizes="any". iOS для иконки на
+    домашнем экране требует PNG — этот сценарий для веб-вью MAX не
+    используется, и отдельная карта под iOS была бы неоправданным весом.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1020"/>
+      <stop offset="1" stop-color="#090b14"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8d6cff"/>
+      <stop offset="0.48" stop-color="#5a54ff"/>
+      <stop offset="1" stop-color="#36cfdf"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path fill="url(#mark)" d="M256 96l42 118 118 42-118 42-42 118-42-118-118-42 118-42z"/>
+  <circle cx="392" cy="120" r="26" fill="#4ce3e8" opacity=".55"/>
+  <circle cx="120" cy="392" r="22" fill="#8d6cff" opacity=".45"/>
+</svg>

@@ -451,3 +451,141 @@ test.describe('аналитика', () => {
     expect(revoked.length, 'запрос отзыва не ушёл').toBe(1);
   });
 });
+
+test.describe('оффлайн', () => {
+  // Главная опасность воркера — не «не заработало», а «заработало неправильно
+  // и тихо»: отдал из кеша прошлую сборку, и после релиза этого никто не
+  // заметил. Поэтому проверяются обе стороны — оффлайн появляется, и свежая
+  // сборка пробивается насквозь.
+  test.use({ serviceWorkers: 'allow' });
+  // Установка воркера тянет двадцать запросов прекэша и сама по себе чувствительна
+  // ко времени. Локально Playwright поднимает шесть воркеров на три проекта, и на
+  // этой нагрузке установка иногда не успевает. Проверяемые утверждения при этом
+  // детерминированы: повтор спасает от медленной машины и не спасёт от ошибки в
+  // логике — та провалила бы все попытки.
+  test.describe.configure({ timeout: 120_000, retries: 2 });
+
+  const ready = async (page, { revision = 'off-1' } = {}) => {
+    // stubMax обязателен: без него /hub-api/ev отдаёт 404, и тест падал бы на
+    // чужой ошибке вместо своей.
+    await stubMax(page);
+    // Один маршрут на контексте вместо page.route из openMenu. Причина: файл
+    // читают и страница, и сервис-воркер, а page.route перехватывает только
+    // страницу. Воркер закэшил бы настоящий файл с другой ревизией, страница
+    // увидела бы подставную — и оффлайн падал бы на несовпадении. Здесь
+    // подставляется ровно то, что увидит и воркер, — как в production, где
+    // оба читают один и тот же файл.
+    await page.context().route('**/runtime-config.js', (route) => route.fulfill({
+      status: 200,
+      contentType: 'text/javascript; charset=utf-8',
+      body: `window.HUB_TRACK_ENDPOINT='/hub-api/ev';`
+        + `window.HUB_CONFIG=${JSON.stringify(PROD_CONFIG)};`
+        + `window.HUB_ASSET_REVISION=${JSON.stringify(revision)};`,
+    }));
+    await openMenu(page);
+    // Ждём результат, а не событие, и ждём именно полный прекэш: install
+    // складывает записи параллельно, поэтому по одному признаку (например, по
+    // js/main.js) проверка проходила, пока index.html ещё не лежал. На полном
+    // прогоне с шестью воркерами эта гонка и проявлялась.
+    await page.waitForFunction(async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      const names = await caches.keys();
+      if (!names.length) return false;
+      const urls = (await (await caches.open(names[0])).keys()).map((r) => r.url);
+      return urls.some((u) => u.endsWith('/index.html')) && urls.some((u) => u.includes('/js/main.js?v='));
+    }, null, { timeout: 30_000 });
+  };
+
+  // Утверждения ждут состояния, а не сэмплируют его один раз: установка
+  // воркера асинхронна, и на нагруженной машине кеш успевал ещё не дописать
+  // записи к моменту проверки. Кеш выбирается по ревизии, а не по индексу —
+  // при смене сборки их рядом две.
+  const waitForCache = async (page, revision, timeout = 30_000) => {
+    const probe = `async (rev) => {
+      const name = (await caches.keys()).find((n) => n.includes(rev));
+      if (!name) return false;
+      const urls = (await (await caches.open(name)).keys()).map((r) => r.url);
+      return urls.some((u) => u.endsWith('/index.html')) && urls.some((u) => u.includes('/js/main.js?v='));
+    }`;
+    await page.waitForFunction(probe, revision, { timeout });
+    return page.evaluate(async (rev) => {
+      const name = (await caches.keys()).find((n) => n.includes(rev));
+      return (await (await caches.open(name)).keys())
+        .map((r) => new URL(r.url).pathname + new URL(r.url).search);
+    }, revision);
+  };
+
+  test('воркер регистрируется и кладёт шелл в кеш', async ({ page }) => {
+    const errors = watchErrors(page);
+    await ready(page);
+    // 127.0.0.1 — потенциально доверенный источник, поэтому воркер и должен
+    // зарегистрироваться. Перестанет — оффлайн исчезнет молча.
+    const scope = await page.evaluate(async () => (await navigator.serviceWorker.getRegistration())?.scope || '');
+    expect(scope, 'воркер не зарегистрировался').toContain('127.0.0.1:4173');
+
+    const keys = await waitForCache(page, 'off-1');
+    // runtime-config.js обязан лежать в кеше: без ревизии из него не грузится
+    // ни один модуль шелла, и оффлайн был бы невозможен. Свежесть при этом
+    // обеспечивает network-first, а не cache-first.
+    expect(keys, 'index.html не прекэшился').toContain('/index.html');
+    expect(keys.some((k) => k.startsWith('/js/main.js?v=')), 'модули шелла не прекэшились').toBe(true);
+    expect(keys, 'конфигурация сборки не закэширована').toContain('/runtime-config.js');
+
+    const fatal = errors.filter((e) => !e.includes('st.max.ru'));
+    expect(fatal, `ошибки оффлайна:\n${fatal.join('\n')}`).toEqual([]);
+  });
+
+  test('меню открывается без сети', async ({ page }) => {
+    await ready(page);
+    await page.context().setOffline(true);
+    try {
+      // Управление проверяется опросом, а не однократно: контроллер бывает
+      // временно null после проверки обновлений воркера, и без опроса тест
+      // ловил момент, а не состояние.
+      await expect
+        .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)), {
+          timeout: 30_000,
+          message: 'страница не управляется сервис-воркером',
+        })
+        .toBe(true);
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      // Оболочка пришла из кеша, значит меню на месте и оффлайн реален.
+      await page.waitForSelector('.gcard', { timeout: 15_000 });
+      expect(await page.locator('.gcard').count(), 'меню не отрисовалось без сети').toBe(12);
+    } finally {
+      await page.context().setOffline(false);
+    }
+  });
+
+  test('новая ревизия пробивается насквозь, а не из старого кеша', async ({ page }) => {
+    // Главный регресс: если бы переходы обслуживались из кеша, после релиза
+    // пользователь видел бы прошлую сборку, не зная об этом.
+    await ready(page);
+    const seen = [];
+    page.on('response', (r) => {
+      if (r.url().includes('js/main.js')) seen.push(r.url());
+    });
+    // Маршрут меняется на контексте, а не на странице: конфиг читает и воркер,
+    // и если он продолжит видеть off-1, новая ревизия просто не появится.
+    await page.context().unroute('**/runtime-config.js');
+    await page.context().route('**/runtime-config.js', (route) => route.fulfill({
+      status: 200,
+      contentType: 'text/javascript; charset=utf-8',
+      body: 'window.HUB_ASSET_REVISION="off-2";',
+    }));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.gcard', { timeout: 15_000 });
+    // Меню может появиться ещё из старого кеша, поэтому новый запрос модуля
+    // ждётся явно, а не проверяется сразу после .gcard.
+    await expect
+      .poll(() => seen.filter((u) => u.includes('v=off-2')).length, {
+        timeout: 30_000,
+        message: `модуль шелла так и не запрошен с новой ревизией: ${seen.join(', ')}`,
+      })
+      .toBeGreaterThan(0);
+    // Кеш новой ревизии создаёт её воркер при установке, то есть асинхронно.
+    await waitForCache(page, 'off-2');
+    const names = await page.evaluate(() => caches.keys());
+    expect(names.some((n) => n.includes('off-2')), `новый кеш не создан: ${names.join(', ')}`).toBe(true);
+  });
+});

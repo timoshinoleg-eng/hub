@@ -11,6 +11,33 @@ const { observeVisit } = await import(`./engagement.js?v=${v}`);
 const { getGameProgress, getSummary, recordFinish } = await import(`./progress.js?v=${v}`);
 const { challengeIntroText, challengeResultState, dailyHeroState, dailyResultText, recordBadgeText } = await import(`./ui-state.js?v=${v}`);
 const { GAMES, byId, visible } = await import(`./games.js?v=${v}`);
+const { swRegisterUrl } = await import(`./offline.js?v=${v}`);
+
+/**
+ * Регистрация оффлайн-оболочки.
+ *
+ * Ревизия уходит в адрес самого воркера, а не в сообщение: у воркера своя
+ * глобальная область, и window.HUB_ASSET_REVISION в ней не существует. Зато
+ * адрес с `?v=` физически не может совпасть с прошлой сборкой — новый релиз
+ * даёт новый URL, новый воркер и новый кеш.
+ *
+ * Ошибки проглатываются намеренно: оффлайн — улучшение, и его отсутствие не
+ * должно превращаться в ошибку в консоли, которую видно как «сбой игры».
+ */
+function registerOffline() {
+  if (!('serviceWorker' in navigator)) return;
+  // В file:// и в небезопасном контексте регистрация бросает, а в MAX
+  // приложение может открываться и с локального диска в отладочных сборках.
+  if (!window.isSecureContext) return;
+  // Корень приложения — на уровень выше js/, а не сама папка js: sw.js лежит
+  // рядом с index.html. Вычисляется отсюда, а не зашивается, чтобы в
+  // production под префиксом /hub/ адрес остался верным.
+  const base = new URL('../', import.meta.url).pathname;
+  navigator.serviceWorker
+    .register(swRegisterUrl(revision, base), { type: 'module', updateViaCache: 'none' })
+    .catch(() => {});
+}
+registerOffline();
 
 const CFG = window.HUB_CONFIG || {};
 const SHOW_ALL = new URLSearchParams(location.search).has('all');

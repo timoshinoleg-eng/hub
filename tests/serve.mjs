@@ -23,7 +23,17 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.json': 'application/json; charset=utf-8',
+  // Без этого манифест приходит как application/octet-stream, и браузер
+  // молча его игнорирует: регистрация PWA не сработает, а тест это не увидит.
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
+
+/** Кеш-заголовки повторяют deploy/nginx.conf, иначе e2e проверяет не тот документ. */
+function cacheControlFor(relPath, ext) {
+  if (relPath === 'runtime-config.js' || relPath === 'sw.js') return 'no-store';
+  if (ext === '.html' || ext === '.js') return 'no-cache, must-revalidate';
+  return 'public, max-age=60';
+}
 
 async function resolveFile(urlPath) {
   // normalize + префиксная проверка: без неё `/../package.json` ушёл бы наружу.
@@ -51,8 +61,10 @@ createServer(async (req, res) => {
   try {
     const body = await readFile(target);
     const ext = extname(target);
+    const relPath = target.slice(ROOT.length + 1).split(sep).join('/');
     const headers = { 'Content-Type': TYPES[ext] || 'application/octet-stream' };
-    headers['Cache-Control'] = ext === '.html' || ext === '.js' ? 'no-cache, must-revalidate' : 'public, max-age=60';
+    headers['Cache-Control'] = cacheControlFor(relPath, ext);
+    if (relPath === 'sw.js') headers['Service-Worker-Allowed'] = '/';
     res.writeHead(200, headers);
     res.end(body);
   } catch {
